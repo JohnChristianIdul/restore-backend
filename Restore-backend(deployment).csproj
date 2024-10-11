@@ -11,15 +11,18 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="CsvHelper.Excel.Core" Version="27.2.1" />
-    <PackageReference Include="Firebase.Auth" Version="1.0.0" />
-    <PackageReference Include="FirebaseAdmin" Version="3.0.1" />
-    <PackageReference Include="FirebaseAuthentication.net" Version="4.1.0" />
-    <PackageReference Include="Google.Cloud.Firestore" Version="3.9.0" />
-    <PackageReference Include="Google.Cloud.Firestore.V1" Version="3.9.0" />
-    <PackageReference Include="Google.Cloud.Storage.V1" Version="4.10.0" />
-    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.21.0" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
+	  <PackageReference Include="CsvHelper" Version="33.0.1" />
+	  <PackageReference Include="ExcelDataReader" Version="3.7.0" />
+	  <PackageReference Include="Firebase.DotNet.Auth" Version="1.0.3" />
+	  <PackageReference Include="FirebaseAdmin" Version="3.0.1" />
+	  <PackageReference Include="Google.Cloud.AIPlatform.V1" Version="3.7.0" />
+	  <PackageReference Include="Google.Cloud.Firestore" Version="3.8.0" />
+	  <PackageReference Include="Google.Cloud.Storage.V1" Version="4.10.0" />
+	  <PackageReference Include="ini-parser" Version="2.5.2" />
+	  <PackageReference Include="IniParser" Version="1.0.1" />
+	  <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.21.0" />
+	  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+	  <PackageReference Include="Swashbuckle.AspNetCore" Version="6.7.3" />
   </ItemGroup>
 
 </Project>
