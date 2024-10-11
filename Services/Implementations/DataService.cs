@@ -40,25 +40,7 @@ namespace ReStore___backend.Services.Implementations
             _bucketName = Environment.GetEnvironmentVariable("FIREBASE_BUCKET_NAME");
 
             // Retrieve Google Application Credentials from Environment Variable
-            string base64Json = Environment.GetEnvironmentVariable("GOOGLE_APPLICATION_KEY");
-
-            if (string.IsNullOrEmpty(base64Json))
-            {
-                throw new InvalidOperationException("GOOGLE_APPLICATION_KEY environment variable is not set.");
-            }
-            try
-            {
-                // Decode the Base64 string back to JSON
-                byte[] jsonBytes = Convert.FromBase64String(base64Json);
-                string jsonCredentials = Encoding.UTF8.GetString(jsonBytes);
-
-                // Use the decoded JSON credentials as needed
-                _credentials = jsonCredentials;
-            }
-            catch (FormatException)
-            {
-                throw new InvalidOperationException("The environment variable value is not a valid Base64 string.");
-            }
+            _credentials = "etc/secrets/GOOGLE_APPLICATION_CREDENTIALS";
 
             // Load credentials from file explicitly
             GoogleCredential credential;
