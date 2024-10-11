@@ -40,7 +40,7 @@ namespace ReStore___backend.Services.Implementations
             _bucketName = Environment.GetEnvironmentVariable("FIREBASE_BUCKET_NAME");
 
             // Retrieve Google Application Credentials from Environment Variable
-            _credentials = "etc/secrets/GOOGLE_APPLICATION_CREDENTIALS";
+            _credentials = "/etc/secrets/GOOGLE_APPLICATION_CREDENTIALS";
 
             // Load credentials from file explicitly
             GoogleCredential credential;
