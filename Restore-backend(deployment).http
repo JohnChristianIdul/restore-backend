@@ -1,0 +1,6 @@
+@Restore_backend_deployment__HostAddress = http://localhost:5210
+
+GET {{Restore_backend_deployment__HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
