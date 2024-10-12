@@ -401,7 +401,13 @@ namespace ReStore___backend.Services.Implementations
                 var formData = new MultipartFormDataContent();
                 formData.Add(new StreamContent(salesData), "file", "sales_data.csv");
 
-                string insightUrl = Environment.GetEnvironmentVariable("API_URL") + "/generate-insights";
+                string apiUrl = Environment.GetEnvironmentVariable("API_URL");
+                if (string.IsNullOrEmpty(apiUrl))
+                {
+                    throw new InvalidOperationException("API_URL environment variable is not set.");
+                }
+
+                string insightUrl = $"{apiUrl}/generate-insights";
                 var response = await _httpClient.PostAsync(insightUrl, formData);
                 insights = await response.Content.ReadAsStringAsync();
 
@@ -508,7 +514,7 @@ namespace ReStore___backend.Services.Implementations
             {
                 using (_httpClient)
                 {
-                    using(var form = new MultipartFormDataContent())
+                    using (var form = new MultipartFormDataContent())
                     {
                         form.Add(new StringContent(username), "username");
 
@@ -530,7 +536,7 @@ namespace ReStore___backend.Services.Implementations
 
                         return "Demand prediction success";
                     }
-                    
+
                 }
             }
             catch (Exception ex)
@@ -595,21 +601,30 @@ namespace ReStore___backend.Services.Implementations
             {
                 using (_httpClient)
                 {
+                    // Retrieve the base URL from the environment variable
+                    string baseUrl = Environment.GetEnvironmentVariable("API_URL");
+
+                    if (string.IsNullOrEmpty(baseUrl))
+                    {
+                        return "Base URL is not set.";
+                    }
+
+                    // Use MultipartFormDataContent to send the file and username
                     using (var form = new MultipartFormDataContent())
                     {
-                        var formData = new MultipartFormDataContent();
-                        formData.Add(new StreamContent(file), "file", $"{file}.csv");
+                        // Add the MemoryStream as file content with a proper filename
+                        form.Add(new StreamContent(file), "file", "sales_data.csv");
                         form.Add(new StringContent(username), "username");
 
-                        string baseUrl = Environment.GetEnvironmentVariable("API_URL");
-
                         // Send the request to train the model
-                        HttpResponseMessage response = await _httpClient.PostAsync(baseUrl + "/train_model", form);
+                        HttpResponseMessage response = await _httpClient.PostAsync($"{baseUrl}/train_model", form);
                         response.EnsureSuccessStatusCode();
 
                         // Read the response content
                         var content = await response.Content.ReadAsStringAsync();
                         var jsonResponse = JsonConvert.DeserializeObject<Dictionary<string, string>>(content);
+
+                        // Check if the response contains a success message
                         string resultMessage = jsonResponse.ContainsKey("message") ? jsonResponse["message"] : jsonResponse["error"];
 
                         if (resultMessage.Equals("error"))
