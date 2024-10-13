@@ -257,13 +257,24 @@ namespace ReStore___backend.Services.Implementations
                 // Upload the CSV file to Cloud Storage
                 await _storageClient.UploadObjectAsync(_bucketName, objectName, null, memoryStream);
 
-                // Pass the memory stream to SalesInsight
-                memoryStream.Position = 0;
-                await SalesInsight(memoryStream, username);
+                // Create a copy of the original memory stream for concurrent process
+                var memoryStreamCopy1 = new MemoryStream();
+                var memoryStreamCopy2 = new MemoryStream();
 
-                //Call TrainModel]
                 memoryStream.Position = 0;
-                await TrainSalesModel(memoryStream, username);
+                await memoryStream.CopyToAsync(memoryStreamCopy1);  // Copy for SalesInsight
+                memoryStream.Position = 0;
+                await memoryStream.CopyToAsync(memoryStreamCopy2);  // Copy for TrainSalesModel
+
+                // Reset the positions of the new memory streams
+                memoryStreamCopy1.Position = 0;
+                memoryStreamCopy2.Position = 0;
+
+                // Run both tasks concurrently
+                await Task.WhenAll(
+                    SalesInsight(memoryStreamCopy1, username),
+                    TrainSalesModel(memoryStreamCopy2, username)
+                );
             }
         }
         public async Task<string> GetSalesDataFromStorageByUsername(string username)
@@ -619,6 +630,7 @@ namespace ReStore___backend.Services.Implementations
                         // Send the request to train the model
                         HttpResponseMessage response = await _httpClient.PostAsync($"{baseUrl}/train_model", form);
                         response.EnsureSuccessStatusCode();
+                        Console.WriteLine("Model trained successfully");
 
                         // Read the response content
                         var content = await response.Content.ReadAsStringAsync();
