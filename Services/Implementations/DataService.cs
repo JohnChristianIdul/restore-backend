@@ -616,6 +616,7 @@ namespace ReStore___backend.Services.Implementations
                         // Send the request to train the model
                         HttpResponseMessage response = await _httpClient.PostAsync($"{baseUrl}/train_model", form);
                         response.EnsureSuccessStatusCode();
+                        Console.WriteLine($"URL : {baseUrl}/train_model");
                         Console.WriteLine("Model trained successfully");
 
                         // Read the response content
