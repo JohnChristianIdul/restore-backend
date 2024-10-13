@@ -409,25 +409,24 @@ namespace ReStore___backend.Services.Implementations
         {
             // Call your API to get the insights
             string insights;
-            using (_httpClient)
+
+            // Remove the using statement for _httpClient
+            var formData = new MultipartFormDataContent();
+            formData.Add(new StreamContent(salesData), "file", "sales_data.csv");
+
+            string apiUrl = Environment.GetEnvironmentVariable("API_URL");
+            if (string.IsNullOrEmpty(apiUrl))
             {
-                var formData = new MultipartFormDataContent();
-                formData.Add(new StreamContent(salesData), "file", "sales_data.csv");
+                throw new InvalidOperationException("API_URL environment variable is not set.");
+            }
 
-                string apiUrl = Environment.GetEnvironmentVariable("API_URL");
-                if (string.IsNullOrEmpty(apiUrl))
-                {
-                    throw new InvalidOperationException("API_URL environment variable is not set.");
-                }
+            string insightUrl = $"{apiUrl}/generate-insights";
+            var response = await _httpClient.PostAsync(insightUrl, formData);
+            insights = await response.Content.ReadAsStringAsync();
 
-                string insightUrl = $"{apiUrl}/generate-insights";
-                var response = await _httpClient.PostAsync(insightUrl, formData);
-                insights = await response.Content.ReadAsStringAsync();
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    throw new Exception($"API call failed: {insights}");
-                }
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new Exception($"API call failed: {insights}");
             }
 
             // Extract the insights text from the JSON response
@@ -451,9 +450,9 @@ namespace ReStore___backend.Services.Implementations
 
             // Convert insights to CSV format
             var csvLines = new List<string>
-            {
-                "InsightData" // Header
-            };
+    {
+        "InsightData" // Header
+    };
 
             // Add the cleaned insights as the body of the CSV
             csvLines.Add(insightsText);
@@ -612,41 +611,38 @@ namespace ReStore___backend.Services.Implementations
         {
             try
             {
-                using (_httpClient)
+                // Retrieve the base URL from the environment variable
+                string baseUrl = Environment.GetEnvironmentVariable("API_URL");
+
+                if (string.IsNullOrEmpty(baseUrl))
                 {
-                    // Retrieve the base URL from the environment variable
-                    string baseUrl = Environment.GetEnvironmentVariable("API_URL");
+                    return "Base URL is not set.";
+                }
 
-                    if (string.IsNullOrEmpty(baseUrl))
+                // Use MultipartFormDataContent to send the file and username
+                using (var form = new MultipartFormDataContent())
+                {
+                    // Add the MemoryStream as file content with a proper filename
+                    form.Add(new StreamContent(file), "file", "sales_data.csv");
+                    form.Add(new StringContent(username), "username");
+
+                    // Send the request to train the model
+                    HttpResponseMessage response = await _httpClient.PostAsync($"{baseUrl}/train_model", form);
+                    response.EnsureSuccessStatusCode();
+
+                    // Read the response content
+                    var content = await response.Content.ReadAsStringAsync();
+                    var jsonResponse = JsonConvert.DeserializeObject<Dictionary<string, string>>(content);
+
+                    // Check if the response contains a success message
+                    string resultMessage = jsonResponse.ContainsKey("message") ? jsonResponse["message"] : jsonResponse["error"];
+
+                    if (resultMessage.Equals("error", StringComparison.OrdinalIgnoreCase))
                     {
-                        return "Base URL is not set.";
+                        return "Failed to train sales model";
                     }
 
-                    // Use MultipartFormDataContent to send the file and username
-                    using (var form = new MultipartFormDataContent())
-                    {
-                        // Add the MemoryStream as file content with a proper filename
-                        form.Add(new StreamContent(file), "file", "sales_data.csv");
-                        form.Add(new StringContent(username), "username");
-
-                        // Send the request to train the model
-                        HttpResponseMessage response = await _httpClient.PostAsync($"{baseUrl}/train_model", form);
-                        response.EnsureSuccessStatusCode();
-
-                        // Read the response content
-                        var content = await response.Content.ReadAsStringAsync();
-                        var jsonResponse = JsonConvert.DeserializeObject<Dictionary<string, string>>(content);
-
-                        // Check if the response contains a success message
-                        string resultMessage = jsonResponse.ContainsKey("message") ? jsonResponse["message"] : jsonResponse["error"];
-
-                        if (resultMessage.Equals("error"))
-                        {
-                            return "Failed to train sales model";
-                        }
-
-                        return "Training sales model success";
-                    }
+                    return "Training sales model success";
                 }
             }
             catch (Exception ex)
