@@ -12,6 +12,7 @@ using Newtonsoft.Json;
 using System.Net.Http.Headers;
 using System.Text;
 using static ReStore___backend.Dtos.DemandPredictionDTO;
+using System.IO;
 
 namespace ReStore___backend.Services.Implementations
 {
@@ -257,24 +258,9 @@ namespace ReStore___backend.Services.Implementations
                 // Upload the CSV file to Cloud Storage
                 await _storageClient.UploadObjectAsync(_bucketName, objectName, null, memoryStream);
 
-                // Create a copy of the original memory stream for concurrent process
-                var memoryStreamCopy1 = new MemoryStream();
-                var memoryStreamCopy2 = new MemoryStream();
-
+                //Call TrainModel
                 memoryStream.Position = 0;
-                await memoryStream.CopyToAsync(memoryStreamCopy1);  // Copy for SalesInsight
-                memoryStream.Position = 0;
-                await memoryStream.CopyToAsync(memoryStreamCopy2);  // Copy for TrainSalesModel
-
-                // Reset the positions of the new memory streams
-                memoryStreamCopy1.Position = 0;
-                memoryStreamCopy2.Position = 0;
-
-                // Run both tasks concurrently
-                await Task.WhenAll(
-                    SalesInsight(memoryStreamCopy1, username),
-                    TrainSalesModel(memoryStreamCopy2, username)
-                );
+                await TrainSalesModel(memoryStream, username);
             }
         }
         public async Task<string> GetSalesDataFromStorageByUsername(string username)
@@ -638,6 +624,10 @@ namespace ReStore___backend.Services.Implementations
 
                         // Check if the response contains a success message
                         string resultMessage = jsonResponse.ContainsKey("message") ? jsonResponse["message"] : jsonResponse["error"];
+
+                        // Pass the memory stream to SalesInsight
+                        file.Position = 0;
+                        await SalesInsight(file, username);
 
                         if (resultMessage.Equals("error"))
                         {
