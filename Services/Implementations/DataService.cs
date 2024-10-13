@@ -184,6 +184,8 @@ namespace ReStore___backend.Services.Implementations
                     Console.WriteLine("Calling Train Demand Model");
                     await TrainDemandModel(memoryStream, username);
 
+                    // Call the PredictDemand method after successful training
+                    await PredictDemand(username);
                 }
             }
         }
@@ -605,9 +607,7 @@ namespace ReStore___backend.Services.Implementations
                         return "Failed to train demand model";
                     }
 
-                    // Call the PredictDemand method after successful training
-                    string predictResult = await PredictDemand(username);
-                    return "Training demand model success, " + predictResult;
+                    return "Training demand model success, ";
                 }
             }
             catch (Exception ex)
