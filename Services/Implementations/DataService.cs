@@ -532,19 +532,32 @@ namespace ReStore___backend.Services.Implementations
 
                     // Send the request to predict demand
                     HttpResponseMessage response = await _httpClient.PostAsync(baseUrl + "/predict_demand", form);
-                    response.EnsureSuccessStatusCode();
+                    response.EnsureSuccessStatusCode(); // Throws if the status code is not 2xx
 
                     // Read the response content
                     var content = await response.Content.ReadAsStringAsync();
-                    var jsonResponse = JsonConvert.DeserializeObject<Dictionary<string, string>>(content);
-                    string resultMessage = jsonResponse.ContainsKey("message") ? jsonResponse["message"] : jsonResponse["error"];
 
-                    if (resultMessage.Equals("error", StringComparison.OrdinalIgnoreCase))
+                    // Check if the response contains an error
+                    var jsonResponse = JsonConvert.DeserializeObject<Dictionary<string, string>>(content);
+                    if (jsonResponse.ContainsKey("error"))
                     {
-                        return "Failed to predict demand";
+                        string errorMessage = jsonResponse["error"];
+                        return $"Error during demand prediction: {errorMessage}";
                     }
 
-                    return "Demand prediction success";
+                    // Check if the response is formatted as a JSON array
+                    if (content.Trim().StartsWith("[") && content.Trim().EndsWith("]"))
+                    {
+                        // Optional: Deserialize the response into a list of predicted demand objects
+                        var predictedDemands = JsonConvert.DeserializeObject<List<DemandPredictionDTO>>(content);
+
+                        // Process the predicted demands as needed
+                        return "Demand prediction success";
+                    }
+                    else
+                    {
+                        return "Failed to predict demand: Invalid response format.";
+                    }
                 }
             }
             catch (Exception ex)
