@@ -258,13 +258,25 @@ namespace ReStore___backend.Services.Implementations
                 // Upload the CSV file to Cloud Storage
                 await _storageClient.UploadObjectAsync(_bucketName, objectName, null, memoryStream);
 
-                //Call TrainModel
+                // Create copies of the memory stream to prevent "closed stream" issues
                 memoryStream.Position = 0;
-                await TrainSalesModel(memoryStream, username);
+                var trainModelStream = new MemoryStream();
+                var salesInsightStream = new MemoryStream();
 
-                // Pass the memory stream to SalesInsight
+                // Copy the data to the new streams
+                await memoryStream.CopyToAsync(trainModelStream);
                 memoryStream.Position = 0;
-                await SalesInsight(memoryStream, username);
+                await memoryStream.CopyToAsync(salesInsightStream);
+
+                // Reset the positions of the new streams
+                trainModelStream.Position = 0;
+                salesInsightStream.Position = 0;
+
+                // Call TrainModel using the copied stream
+                await TrainSalesModel(trainModelStream, username);
+
+                // Pass the copied memory stream to SalesInsight
+                await SalesInsight(salesInsightStream, username);
             }
         }
         public async Task<string> GetSalesDataFromStorageByUsername(string username)
