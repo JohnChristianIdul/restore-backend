@@ -524,31 +524,27 @@ namespace ReStore___backend.Services.Implementations
         {
             try
             {
-                using (_httpClient)
+                using (var form = new MultipartFormDataContent())
                 {
-                    using (var form = new MultipartFormDataContent())
+                    form.Add(new StringContent(username), "username");
+
+                    string baseUrl = Environment.GetEnvironmentVariable("API_URL");
+
+                    // Send the request to predict demand
+                    HttpResponseMessage response = await _httpClient.PostAsync(baseUrl + "/predict_demand", form);
+                    response.EnsureSuccessStatusCode();
+
+                    // Read the response content
+                    var content = await response.Content.ReadAsStringAsync();
+                    var jsonResponse = JsonConvert.DeserializeObject<Dictionary<string, string>>(content);
+                    string resultMessage = jsonResponse.ContainsKey("message") ? jsonResponse["message"] : jsonResponse["error"];
+
+                    if (resultMessage.Equals("error", StringComparison.OrdinalIgnoreCase))
                     {
-                        form.Add(new StringContent(username), "username");
-
-                        string baseUrl = Environment.GetEnvironmentVariable("API_URL");
-
-                        // Send the request to train the model
-                        HttpResponseMessage response = await _httpClient.PostAsync(baseUrl + "/predict_demand", form);
-                        response.EnsureSuccessStatusCode();
-
-                        // Read the response content
-                        var content = await response.Content.ReadAsStringAsync();
-                        var jsonResponse = JsonConvert.DeserializeObject<Dictionary<string, string>>(content);
-                        string resultMessage = jsonResponse.ContainsKey("message") ? jsonResponse["message"] : jsonResponse["error"];
-
-                        if (resultMessage.Equals("error"))
-                        {
-                            return "Failed to predict demand";
-                        }
-
-                        return "Demand prediction success";
+                        return "Failed to predict demand";
                     }
 
+                    return "Demand prediction success";
                 }
             }
             catch (Exception ex)
@@ -559,7 +555,6 @@ namespace ReStore___backend.Services.Implementations
         public async Task<string> TrainDemandModel(MemoryStream file, string username)
         {
             Console.WriteLine("Calling Train Demand Model");
-
             Console.WriteLine($"MemoryStream with {username}");
 
             if (file == null || file.Length == 0)
@@ -576,7 +571,7 @@ namespace ReStore___backend.Services.Implementations
                     streamContent.Headers.ContentType = MediaTypeHeaderValue.Parse("text/csv");
 
                     // Add the MemoryStream as a CSV file in the form
-                    form.Add(streamContent, "file", $"{file}.csv");
+                    form.Add(streamContent, "file", $"{username}_file.csv"); // Use username for clarity
 
                     // Add the username
                     form.Add(new StringContent(username), "username");
@@ -592,14 +587,14 @@ namespace ReStore___backend.Services.Implementations
                     var jsonResponse = JsonConvert.DeserializeObject<Dictionary<string, string>>(content);
                     string resultMessage = jsonResponse.ContainsKey("message") ? jsonResponse["message"] : jsonResponse["error"];
 
-                    if (resultMessage.Equals("error"))
+                    if (resultMessage.Equals("error", StringComparison.OrdinalIgnoreCase))
                     {
                         return "Failed to train demand model";
                     }
 
-                    await PredictDemand(username);
-
-                    return "Training demand model success";
+                    // Call the PredictDemand method after successful training
+                    string predictResult = await PredictDemand(username);
+                    return "Training demand model success, " + predictResult;
                 }
             }
             catch (Exception ex)
