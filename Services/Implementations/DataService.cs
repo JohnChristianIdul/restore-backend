@@ -261,6 +261,10 @@ namespace ReStore___backend.Services.Implementations
                 //Call TrainModel
                 memoryStream.Position = 0;
                 await TrainSalesModel(memoryStream, username);
+
+                // Pass the memory stream to SalesInsight
+                memoryStream.Position = 0;
+                await SalesInsight(memoryStream, username);
             }
         }
         public async Task<string> GetSalesDataFromStorageByUsername(string username)
@@ -616,8 +620,6 @@ namespace ReStore___backend.Services.Implementations
                         // Send the request to train the model
                         HttpResponseMessage response = await _httpClient.PostAsync($"{baseUrl}/train_model", form);
                         response.EnsureSuccessStatusCode();
-                        Console.WriteLine($"URL : {baseUrl}/train_model");
-                        Console.WriteLine("Model trained successfully");
 
                         // Read the response content
                         var content = await response.Content.ReadAsStringAsync();
@@ -625,10 +627,6 @@ namespace ReStore___backend.Services.Implementations
 
                         // Check if the response contains a success message
                         string resultMessage = jsonResponse.ContainsKey("message") ? jsonResponse["message"] : jsonResponse["error"];
-
-                        // Pass the memory stream to SalesInsight
-                        file.Position = 0;
-                        await SalesInsight(file, username);
 
                         if (resultMessage.Equals("error"))
                         {
