@@ -11,11 +11,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(name: AllowMyOrigins,
-                    policy =>
+                    builder =>
                     {
-                        policy.WithOrigins("https://670c971af5598e0009c5bd18--restore-test.netlify.app/")
-                                            .AllowAnyHeader()
-                                            .AllowAnyMethod();
+                        builder.AllowAnyOrigin()
+                        .AllowAnyMethod()
+                        .AllowAnyHeader();
                     });
 });
 
