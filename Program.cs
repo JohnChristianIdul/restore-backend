@@ -3,18 +3,20 @@ using ReStore___backend.Services.Implementations;
 using ReStore___backend.Services.Interfaces;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
+var AllowMyOrigins = "_allowMyorigins";
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowSpecificOrigin", corsBuilder => // changed var name to corsBuilder
-    {
-        corsBuilder.WithOrigins("http://localhost:5173")  //changed port for frontend
-                   .AllowAnyMethod()
-                   .AllowAnyHeader()
-                   .AllowCredentials();
-    });
+    options.AddPolicy(name: AllowMyOrigins,
+                    policy =>
+                    {
+                        policy.WithOrigins("https://670c971af5598e0009c5bd18--restore-test.netlify.app/")
+                                            .AllowAnyHeader()
+                                            .AllowAnyMethod();
+                    });
 });
 
 builder.Services.AddControllers();
@@ -48,7 +50,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseRouting(); // added UseRouting
 
-app.UseCors("AllowSpecificOrigin");
+app.UseCors(AllowMyOrigins);
 
 app.UseAuthorization();
 
