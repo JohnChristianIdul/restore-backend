@@ -186,24 +186,37 @@ namespace ReStore___backend.Services.Implementations
                 throw new ArgumentException("Email and verification link must be provided.");
             }
 
-            var smtpClient = new SmtpClient("smtp.gmail.com")
+            try
             {
-                Port = 465,
-                Credentials = new NetworkCredential(_smtpEmail, _smtpPassword),
-                EnableSsl = true,
-            };
+                var smtpClient = new SmtpClient("smtp.gmail.com")
+                {
+                    Port = 587,
+                    Credentials = new NetworkCredential(_smtpEmail, _smtpPassword),
+                    EnableSsl = true, 
+                };
 
-            var mailMessage = new MailMessage
+                var mailMessage = new MailMessage
+                {
+                    From = new MailAddress(_smtpEmail),
+                    Subject = "Verify your email",
+                    Body = $"<p>Please verify your email by clicking on this link: <a href='{verificationLink}'>Verify Email</a></p>",
+                    IsBodyHtml = true,
+                };
+
+                mailMessage.To.Add(email);
+
+                await smtpClient.SendMailAsync(mailMessage);
+            }
+            catch (SmtpException smtpEx)
             {
-                From = new MailAddress(_smtpEmail),
-                Subject = "Verify your email",
-                Body = $"Please verify your email by clicking on this link: {verificationLink}",
-                IsBodyHtml = true,
-            };
-
-            mailMessage.To.Add(email);
-
-            await smtpClient.SendMailAsync(mailMessage);
+                Console.WriteLine($"SMTP error during email sending: {smtpEx}");
+                throw new InvalidOperationException("Error sending verification email: " + smtpEx.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Unexpected error during email sending: {ex}");
+                throw new InvalidOperationException("Unexpected error sending verification email: " + ex.Message);
+            }
         }
         public async Task<LoginResultDTO> Login(string email, string password)
         {
