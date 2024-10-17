@@ -96,18 +96,7 @@ namespace ReStore___backend.Services.Implementations
                     return "Error: All fields are required.";
                 }
 
-                // Check if there's an existing pending registration
-                var pendingUserQuery = await _firestoreDb.Collection("PendingUsers")
-                    .WhereEqualTo("email", email)
-                    .GetSnapshotAsync();
-
-                if (pendingUserQuery.Count > 0)
-                {
-                    // Delete existing pending registration
-                    await _firestoreDb.Collection("PendingUsers").Document(pendingUserQuery.Documents[0].Id).DeleteAsync();
-                }
-
-                // Check if the email is already registered in Users collection
+                // Check if the email is already registered
                 var existingUserQuery = await _firestoreDb.Collection("Users")
                     .WhereEqualTo("email", email)
                     .GetSnapshotAsync();
@@ -125,23 +114,20 @@ namespace ReStore___backend.Services.Implementations
                     DisplayName = name
                 });
 
-                // Generate email verification link
+                // Send email verification link
                 string verificationLink = await _firebaseAuth.GenerateEmailVerificationLinkAsync(email);
-
-                // Save user data in PendingUsers collection
-                var pendingUserDoc = new Dictionary<string, object>
-                {
-                    { "email", email },
-                    { "name", name },
-                    { "username", username },
-                    { "phone_number", phoneNumber },
-                    { "verified", false },
-                    { "verificationLink", verificationLink },
-                };
-                await _firestoreDb.Collection("PendingUsers").Document(authResult.Uid).SetAsync(pendingUserDoc);
-
-                // Send the email verification link
                 await SendVerificationEmailAsync(email, verificationLink);
+
+                // Save user data to the Firestore Users collection (with 'verified' set to false initially)
+                var userDoc = new Dictionary<string, object>
+        {
+            { "email", email },
+            { "name", name },
+            { "username", username },
+            { "phone_number", phoneNumber },
+            { "verified", false } // initially not verified
+        };
+                await _firestoreDb.Collection("Users").Document(authResult.Uid).SetAsync(userDoc);
 
                 return "User created successfully. Please verify your email to complete the sign-up process.";
             }
@@ -156,7 +142,6 @@ namespace ReStore___backend.Services.Implementations
                 return $"Unexpected error during sign-up: {ex.Message}";
             }
         }
-
         public async Task<string> VerifyEmail(string oobCode)
         {
             try
@@ -273,11 +258,22 @@ namespace ReStore___backend.Services.Implementations
                 // Authenticate user with Firebase Auth
                 var auth = await _authProvider.SignInWithEmailAndPasswordAsync(email, password);
 
+                // Check if the email is verified
+                if (!auth.User.IsEmailVerified)
+                {
+                    return new LoginResultDTO
+                    {
+                        Token = null,
+                        Username = null,
+                        ErrorMessage = "Email is not verified. Please verify your email before logging in."
+                    };
+                }
+
                 // Retrieve the authenticated user's ID
                 var userId = auth.User.LocalId;
 
                 // Fetch user data from Firestore or your chosen database
-                var userDoc = await _firestoreDb.Collection("Users").Document(userId).GetSnapshotAsync();               
+                var userDoc = await _firestoreDb.Collection("Users").Document(userId).GetSnapshotAsync();
 
                 if (!userDoc.Exists)
                 {
