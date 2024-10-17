@@ -86,22 +86,20 @@ namespace ReStore___backend.Controllers
             }
         }
 
-        [HttpPost("verifyEmail")]
-        public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailDTO verifyEmailDto)
+        [HttpGet("verify-email")]
+        public async Task<IActionResult> VerifyEmail(string oobCode)
         {
-            if (verifyEmailDto == null || string.IsNullOrWhiteSpace(verifyEmailDto.oobCode))
-                return BadRequest(new { error = "Invalid verification data." });
-            try
+            // Call the existing VerifyEmail method, passing the oobCode
+            var verificationResult = await VerifyEmail(oobCode);
+
+            if (verificationResult.StartsWith("Error"))
             {
-                var result = await _dataService.VerifyEmail(verifyEmailDto.oobCode);
-                if (result.StartsWith("Error"))
-                    return BadRequest(new { error = result });
-                return Ok(new { message = result });
+                // Handle errors, e.g., show an error page or message
+                return BadRequest(verificationResult);
             }
-            catch (Exception ex)
-            {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
-            }
+
+            // Optionally, redirect to a success page or return a success message
+            return Ok("Email verified successfully! You can now log in.");
         }
     }
 }

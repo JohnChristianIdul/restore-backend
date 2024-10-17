@@ -153,12 +153,11 @@ namespace ReStore___backend.Services.Implementations
                 return $"Unexpected error during sign-up: {ex.Message}";
             }
         }
-
         public async Task<string> VerifyEmail(string oobCode)
         {
             try
             {
-                // Use Firebase Auth REST API to verify the email
+                // Verify the email using the oobCode
                 var response = await _httpClient.PostAsync(
                     $"https://identitytoolkit.googleapis.com/v1/accounts:update?key={_storageClient}",
                     JsonContent.Create(new { oobCode })
@@ -184,6 +183,13 @@ namespace ReStore___backend.Services.Implementations
                 var user = await _firebaseAuth.GetUserByEmailAsync(email);
                 string userId = user.Uid;
 
+                // Check if the user is already in the Users collection
+                var existingUserDoc = await _firestoreDb.Collection("Users").Document(userId).GetSnapshotAsync();
+                if (existingUserDoc.Exists)
+                {
+                    return "Email already verified.";
+                }
+
                 // Get the user data from PendingUsers
                 var pendingUserDoc = await _firestoreDb.Collection("PendingUsers").Document(userId).GetSnapshotAsync();
                 if (!pendingUserDoc.Exists)
@@ -194,16 +200,17 @@ namespace ReStore___backend.Services.Implementations
                 var pendingUserData = pendingUserDoc.ToDictionary();
 
                 // Remove verification-specific fields
-                pendingUserData.Remove("verificationLink");
+                pendingUserData.Remove("verificationToken");
+                pendingUserData.Remove("tokenExpiration");
                 pendingUserData["verified"] = true;
 
-                // Move the user data to VerifiedUsers collection
-                await _firestoreDb.Collection("VerifiedUsers").Document(userId).SetAsync(pendingUserData);
+                // Move the user data to Users collection
+                await _firestoreDb.Collection("Users").Document(userId).SetAsync(pendingUserData);
 
                 // Delete the pending user data
                 await _firestoreDb.Collection("PendingUsers").Document(userId).DeleteAsync();
 
-                return "Email verified successfully, and user data stored in verified users collection.";
+                return "Email verified successfully, and user data stored.";
             }
             catch (FirebaseAuthException fae)
             {
@@ -216,7 +223,6 @@ namespace ReStore___backend.Services.Implementations
                 return $"Error during email verification: {ex.Message}";
             }
         }
-
         public async Task SendVerificationEmailAsync(string email, string verificationLink)
         {
             if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(verificationLink))
