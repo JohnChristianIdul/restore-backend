@@ -186,14 +186,9 @@ namespace ReStore___backend.Services.Implementations
                 throw new ArgumentException("Email and verification link must be provided.");
             }
 
-            if (string.IsNullOrWhiteSpace(_smtpEmail) || string.IsNullOrWhiteSpace(_smtpPassword))
-            {
-                throw new InvalidOperationException("SMTP credentials are not properly configured.");
-            }
-
             var smtpClient = new SmtpClient("smtp.gmail.com")
             {
-                Port = 587,
+                Port = 465,
                 Credentials = new NetworkCredential(_smtpEmail, _smtpPassword),
                 EnableSsl = true,
             };
