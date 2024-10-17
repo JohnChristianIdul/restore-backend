@@ -1,6 +1,7 @@
 ﻿using Firebase.Auth.Objects;
 using FirebaseAdmin.Auth;
 using Google.Cloud.Firestore;
+using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
 using ReStore___backend.Dtos;
 using ReStore___backend.Services.Interfaces;
@@ -53,18 +54,16 @@ namespace ReStore___backend.Controllers
             }
         }
         [HttpPost("login")]
-        public async Task<IActionResult> Login(string email, string password)
+        public async Task<IActionResult> Login([FromBody] LoginDTO login)
         {
-            // Validate inputs
-            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+            if (string.IsNullOrWhiteSpace(login.Email) || string.IsNullOrWhiteSpace(login.Password))
             {
                 return BadRequest(new { error = "Email and password are required." });
             }
 
             try
             {
-                // Use DataService to handle the login logic
-                var loginResult = await _dataService.Login(email, password);
+                var loginResult = await _dataService.Login(login.Email, login.Password);
 
                 // Check if there was an error (like unverified email)
                 if (!string.IsNullOrEmpty(loginResult.ErrorMessage))
