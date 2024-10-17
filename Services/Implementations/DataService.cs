@@ -94,54 +94,30 @@ namespace ReStore___backend.Services.Implementations
                     return "Error: All fields are required.";
                 }
 
-                // Check if Firebase Auth provider is initialized
+                // Ensure Firebase Auth provider is initialized
                 if (_authProvider == null)
                 {
                     return "Error: Firebase Auth is not initialized.";
                 }
 
-                // Check if Firestore is initialized
-                if (_firestoreDb == null)
-                {
-                    return "Error: Firestore is not initialized.";
-                }
-
-                // Step 1: Try to create user in Firebase Auth
+                // Create the user in Firebase Authentication
                 var authResult = await _authProvider.CreateUserWithEmailAndPasswordAsync(email, password, name, true);
                 var user = authResult.User;
 
-                // If user creation failed, return an error
                 if (user == null)
                 {
                     return "Error: Failed to create user.";
                 }
 
-                // Generate email verification link
+                // Generate email verification link and send email
                 string verificationLink = await FirebaseAuth.DefaultInstance.GenerateEmailVerificationLinkAsync(email);
-
-                // Send verification email
                 await SendVerificationEmailAsync(email, verificationLink);
 
-                // Step 2: Wait for email verification (In production, this could involve more checks such as triggering verification events)
-
-                // Step 3: Only after verification, save user details to Firestore
-                string userId = user.LocalId;
-                var userDoc = new Dictionary<string, object>
-        {
-            { "email", email },
-            { "name", name },
-            { "username", username },
-            { "phone_number", phoneNumber }
-        };
-
-                DocumentReference docRef = _firestoreDb.Collection("Users").Document(userId);
-                await docRef.SetAsync(userDoc);
-
-                return "User signed up successfully, please verify your email.";
+                return "User created successfully. Please verify your email before proceeding.";
             }
             catch (FirebaseAuthException fae)
             {
-                // Handle specific Firebase Auth errors
+                // Handle Firebase Auth-specific errors
                 if (fae.Message.Contains("EMAIL_EXISTS"))
                 {
                     return "Error: This email is already registered.";
@@ -156,11 +132,46 @@ namespace ReStore___backend.Services.Implementations
             }
             catch (Exception ex)
             {
-                // Handle any other unexpected errors
+                // Handle unexpected errors
                 Console.WriteLine($"Unexpected error during sign-up: {ex}");
                 return $"Unexpected error during sign-up: {ex.Message}";
             }
         }
+        public async Task<string> CompleteRegistrationAfterVerification(string email, string name, string username, string phoneNumber)
+        {
+            try
+            {
+                // Fetch the user by email (assuming they have signed in again)
+                var user = await FirebaseAuth.DefaultInstance.GetUserByEmailAsync(email);
+
+                // Check if the email is verified
+                if (!user.EmailVerified)
+                {
+                    return "Error: Please verify your email before proceeding.";
+                }
+
+                // Save user details to Firestore once email is verified
+                string userId = user.Uid;
+                var userDoc = new Dictionary<string, object>
+                {
+                    { "email", email },
+                    { "name", name },
+                    { "username", username },
+                    { "phone_number", phoneNumber }
+                };
+
+                DocumentReference docRef = _firestoreDb.Collection("Users").Document(userId);
+                await docRef.SetAsync(userDoc);
+
+                return "Registration complete. User details saved successfully.";
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error during completing registration: {ex}");
+                return $"Error: {ex.Message}";
+            }
+        }
+
         public async Task SendVerificationEmailAsync(string email, string verificationLink)
         {
             if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(verificationLink))

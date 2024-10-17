@@ -19,6 +19,7 @@ namespace ReStore___backend.Services.Interfaces
         Task<string> GetDemandPrediction(string username);
         Task<string> SignUp(string email, string name, string username, string phoneNumber, string password);
         Task SendVerificationEmailAsync(string email, string verificationLink);
+        Task<string> CompleteRegistrationAfterVerification(string email, string name, string username, string phoneNumber);
         Task<LoginResultDTO> Login(string email, string password);
         Task SendPasswordResetEmailAsync(string email, string resetLink);
     }
