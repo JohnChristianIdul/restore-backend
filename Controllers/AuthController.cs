@@ -75,8 +75,7 @@ namespace ReStore___backend.Controllers
         {
             try
             {
-                var resetLink = await FirebaseAuth.DefaultInstance.GeneratePasswordResetLinkAsync(email);
-                await _dataService.SendPasswordResetEmailAsync(email, resetLink);
+                await _dataService.SendPasswordResetEmailAsync(email);
                 return Ok("Password reset email sent.");
             }
             catch (FirebaseAuthException ex)
