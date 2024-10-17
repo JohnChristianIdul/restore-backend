@@ -255,8 +255,25 @@ namespace ReStore___backend.Services.Implementations
         {
             try
             {
+                // Ensure the Firebase Auth service is initialized
+                if (_authProvider == null)
+                {
+                    throw new InvalidOperationException("Firebase Auth service is not initialized.");
+                }
+
                 // Authenticate user with Firebase Auth
                 var auth = await _authProvider.SignInWithEmailAndPasswordAsync(email, password);
+
+                // Check if the authentication result or user is null
+                if (auth == null || auth.User == null)
+                {
+                    return new LoginResultDTO
+                    {
+                        Token = null,
+                        Username = null,
+                        ErrorMessage = "Authentication failed. Please check your credentials."
+                    };
+                }
 
                 // Check if the email is verified
                 if (!auth.User.IsEmailVerified)
@@ -267,6 +284,12 @@ namespace ReStore___backend.Services.Implementations
                         Username = null,
                         ErrorMessage = "Email is not verified. Please verify your email before logging in."
                     };
+                }
+
+                // Ensure Firestore is initialized
+                if (_firestoreDb == null)
+                {
+                    throw new InvalidOperationException("Firestore service is not initialized.");
                 }
 
                 // Retrieve the authenticated user's ID
