@@ -94,30 +94,18 @@ namespace ReStore___backend.Controllers
 
             try
             {
-                // Check if the email is verified
-                var isVerified = await _dataService.IsEmailVerified(verifyEmailDto.UserId);
-                if (!isVerified)
-                    return BadRequest(new { error = "Email not verified." });
+                // Call service method to verify email and move data
+                var result = await _dataService.VerifyEmail(verifyEmailDto.UserId);
 
-                // Move user data from PendingUsers to Users
-                var pendingUserDoc = await _firestoreDb.Collection("PendingUsers").Document(verifyEmailDto.UserId).GetSnapshotAsync();
-                if (!pendingUserDoc.Exists)
-                    return BadRequest(new { error = "User not found in pending state." });
+                if (result.StartsWith("Error"))
+                    return BadRequest(new { error = result });
 
-                var userDoc = pendingUserDoc.ToDictionary();
-                userDoc["verified"] = true;
-
-                await _firestoreDb.Collection("Users").Document(verifyEmailDto.UserId).SetAsync(userDoc);
-                await _firestoreDb.Collection("PendingUsers").Document(verifyEmailDto.UserId).DeleteAsync();
-
-                return Ok(new { message = "Email verified and user data stored." });
+                return Ok(new { message = result });
             }
             catch (Exception ex)
             {
                 return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
             }
         }
-
-
     }
 }

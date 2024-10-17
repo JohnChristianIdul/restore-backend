@@ -98,15 +98,9 @@ namespace ReStore___backend.Services.Implementations
                 var authResult = await FirebaseAuth.DefaultInstance.CreateUserAsync(new UserRecordArgs
                 {
                     Email = email,
-                    EmailVerified = false,
-                    Password = password
+                    Password = password,
+                    DisplayName = name
                 });
-
-                var user = authResult;
-                if (user == null)
-                {
-                    return "Error: Failed to create user.";
-                }
 
                 // Temporarily save user data
                 var pendingUserDoc = new Dictionary<string, object>
@@ -118,13 +112,13 @@ namespace ReStore___backend.Services.Implementations
                     { "password", password },
                     { "verified", false }
                 };
-                await _firestoreDb.Collection("PendingUsers").Document(user.Uid).SetAsync(pendingUserDoc);
+                await _firestoreDb.Collection("PendingUsers").Document(authResult.Uid).SetAsync(pendingUserDoc);
 
-                // Generate email verification link
-                var verificationLink = await FirebaseAuth.DefaultInstance.GenerateEmailVerificationLinkAsync(email);
+                // Send the email verification link
+                string verificationLink = await FirebaseAuth.DefaultInstance.GenerateEmailVerificationLinkAsync(email);
+                await SendVerificationEmailAsync(email, verificationLink);
 
-                // Returning the verification link to be sent in the controller
-                return $"User created successfully. Please verify your email to complete the sign-up process. Verification Link: {verificationLink}";
+                return "User created successfully. Please verify your email to complete the sign-up process.";
             }
             catch (FirebaseAuthException fae)
             {
@@ -145,10 +139,76 @@ namespace ReStore___backend.Services.Implementations
                 return $"Unexpected error during sign-up: {ex.Message}";
             }
         }
+
         public async Task<bool> IsEmailVerified(string userId)
         {
             var userRecord = await FirebaseAuth.DefaultInstance.GetUserAsync(userId);
             return userRecord.EmailVerified;
+        }
+
+        public async Task<string> VerifyEmail(string userId)
+        {
+            try
+            {
+                // Check if the email is verified
+                var isVerified = await IsEmailVerified(userId);
+                if (!isVerified)
+                {
+                    return "Error: Email not verified.";
+                }
+
+                // Move user data from PendingUsers to Users
+                var pendingUserDoc = await _firestoreDb.Collection("PendingUsers").Document(userId).GetSnapshotAsync();
+                if (!pendingUserDoc.Exists)
+                {
+                    return "Error: User not found in pending state.";
+                }
+
+                var userDoc = pendingUserDoc.ToDictionary();
+                userDoc["verified"] = true;
+
+                await _firestoreDb.Collection("Users").Document(userId).SetAsync(userDoc);
+                await _firestoreDb.Collection("PendingUsers").Document(userId).DeleteAsync();
+
+                return "Email verified and user data stored.";
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Unexpected error during email verification: {ex}");
+                return $"Unexpected error during email verification: {ex.Message}";
+            }
+        }
+
+        public async Task SendVerificationEmailAsync(string email, string verificationLink)
+        {
+            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(verificationLink))
+            {
+                throw new ArgumentException("Email and verification link must be provided.");
+            }
+
+            if (string.IsNullOrWhiteSpace(_smtpEmail) || string.IsNullOrWhiteSpace(_smtpPassword))
+            {
+                throw new InvalidOperationException("SMTP credentials are not properly configured.");
+            }
+
+            var smtpClient = new SmtpClient("smtp.gmail.com")
+            {
+                Port = 587,
+                Credentials = new NetworkCredential(_smtpEmail, _smtpPassword),
+                EnableSsl = true,
+            };
+
+            var mailMessage = new MailMessage
+            {
+                From = new MailAddress(_smtpEmail),
+                Subject = "Verify your email",
+                Body = $"Please verify your email by clicking on this link: {verificationLink}",
+                IsBodyHtml = true,
+            };
+
+            mailMessage.To.Add(email);
+
+            await smtpClient.SendMailAsync(mailMessage);
         }
         public async Task<LoginResultDTO> Login(string email, string password)
         {
