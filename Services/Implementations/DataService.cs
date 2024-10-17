@@ -13,6 +13,13 @@ using System.Net.Http.Headers;
 using System.Text;
 using static ReStore___backend.Dtos.DemandPredictionDTO;
 using System.IO;
+using FirebaseAdmin.Auth;
+using System.Net.Mail;
+using Microsoft.AspNetCore.Identity;
+using System.Net.NetworkInformation;
+using System.Net;
+using static Google.Rpc.Help.Types;
+using System.Xml.Linq;
 
 namespace ReStore___backend.Services.Implementations
 {
@@ -28,6 +35,8 @@ namespace ReStore___backend.Services.Implementations
         private readonly string _location;
         private readonly string _endpointId;
         private readonly string _credentials;
+        private readonly string _smtpEmail;
+        private readonly string _smtpPassword;
 
         public DataService()
         {
@@ -42,6 +51,10 @@ namespace ReStore___backend.Services.Implementations
 
             // Retrieve Google Application Credentials from Environment Variable
             _credentials = "/etc/secrets/GOOGLE_APPLICATION_CREDENTIALS";
+
+            // Set support email
+            _smtpPassword = Environment.GetEnvironmentVariable("SMTP_EMAIL_PASSWORD");
+            _smtpEmail = Environment.GetEnvironmentVariable("SMTP_EMAIL");
 
             // Load credentials from file explicitly
             GoogleCredential credential;
@@ -82,6 +95,35 @@ namespace ReStore___backend.Services.Implementations
                 // Get the user ID from the created user
                 string userId = auth.User.LocalId;
 
+                // Check email verification
+                var userRecord = new UserRecordArgs
+                {
+                    Email = $"{email}",
+                    EmailVerified = false
+                };
+
+                var verificationLink = await FirebaseAuth.DefaultInstance.GenerateEmailVerificationLinkAsync(userRecord.Email);
+
+                // Create an SMTP client                
+                var smtpClient = new SmtpClient("smtp.gmail.com")
+                {
+                    Port = 587,
+                    Credentials = new NetworkCredential($"{_smtpEmail}", $"{_smtpPassword}"),
+                    EnableSsl = true,
+                };
+
+                // Send email verification
+                var emailMessage = new MailMessage
+                {
+                    From = new MailAddress($"{_smtpEmail}"),
+                    Subject = "Verify your email",
+                    Body = $"Please verify your email by clicking on this link: {verificationLink}",
+                    IsBodyHtml = true,
+                };
+
+                emailMessage.To.Add(email);
+                await smtpClient.SendMailAsync(emailMessage);
+
                 // Create a document in Firestore to store additional user details
                 var userDoc = new Dictionary<string, object>
                 {
@@ -109,6 +151,17 @@ namespace ReStore___backend.Services.Implementations
             {
                 // Authenticate user with Firebase Auth
                 var auth = await _authProvider.SignInWithEmailAndPasswordAsync(email, password);
+
+                // Check if the user's email is verified
+                if (!auth.User.IsEmailVerified)
+                {
+                    return new LoginResultDTO
+                    {
+                        Token = null,
+                        Username = null,
+                        ErrorMessage = "Email not verified. Please verify your email before logging in."
+                    };
+                }
 
                 // Retrieve the authenticated user's ID
                 var userId = auth.User.LocalId;
@@ -144,6 +197,27 @@ namespace ReStore___backend.Services.Implementations
                     Username = null
                 };
             }
+        }
+        public async Task SendPasswordResetEmailAsync(string email, string resetLink)
+        {
+            var smtpClient = new SmtpClient("smtp.gmail.com")
+            {
+                Port = 587,
+                Credentials = new NetworkCredential($"{_smtpEmail}", $"{_smtpPassword}"),
+                EnableSsl = true,
+            };
+
+            var emailMessage = new MailMessage
+            {
+                From = new MailAddress($"{_smtpEmail}"),
+                Subject = "Reset your password",
+                Body = $"Click the following link to reset your password: {resetLink}",
+                IsBodyHtml = true,
+            };
+
+            emailMessage.To.Add(email);
+
+            await smtpClient.SendMailAsync(emailMessage);
         }
         public async Task ProcessAndUploadDataDemands(IEnumerable<dynamic> records, string username)
         {

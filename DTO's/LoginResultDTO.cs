@@ -4,5 +4,6 @@
     {
         public required string Token { get; set; }
         public string? Username { get; set; }
+        public string? ErrorMessage { get; set; }
     }
 }
