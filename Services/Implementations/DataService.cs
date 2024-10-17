@@ -19,6 +19,8 @@ using FirebaseAdmin;
 using System.Security.Cryptography;
 using Newtonsoft.Json.Linq;
 using Restore_backend_deployment_.DTO_s;
+using System.Reflection.Emit;
+using ReStore___backend.Controllers;
 
 namespace ReStore___backend.Services.Implementations
 {
@@ -38,8 +40,9 @@ namespace ReStore___backend.Services.Implementations
         private readonly string _smtpEmail;
         private readonly string _smtpPassword;
         private readonly FirebaseAuth _firebaseAuth;
+        private readonly ILogger<AuthController> _logger;
 
-        public DataService()
+        public DataService(ILogger<AuthController> logger)
         {
             _httpClient = new HttpClient();
             string firebaseApiKey = Environment.GetEnvironmentVariable("FIREBASE_API_KEY");
@@ -48,6 +51,7 @@ namespace ReStore___backend.Services.Implementations
             _smtpPassword = Environment.GetEnvironmentVariable("SMTP_EMAIL_PASSWORD");
             _smtpEmail = Environment.GetEnvironmentVariable("SMTP_EMAIL");
             _renderUrl = Environment.GetEnvironmentVariable("API_URL_RENDER");
+            _logger = logger;
 
             // Load credentials from file explicitly
             GoogleCredential credential;
@@ -142,75 +146,80 @@ namespace ReStore___backend.Services.Implementations
                 return $"Unexpected error during sign-up: {ex.Message}";
             }
         }
-        public async Task<string> VerifyEmail(string oobCode)
+        public async Task<(bool success, string message)> VerifyEmail(string oobCode)
         {
+            if (string.IsNullOrEmpty(oobCode))
+            {
+                _logger.LogError("No oobCode provided for email verification.");
+                return (false, "Verification code is missing.");
+            }
+
             try
             {
-                var request = new HttpRequestMessage(HttpMethod.Post, "https://identitytoolkit.googleapis.com/v1/accounts:update")
+                var requestBody = new { oobCode };
+                var response = await _httpClient.PostAsync(
+                    "https://identitytoolkit.googleapis.com/v1/accounts:update",
+                    JsonContent.Create(requestBody)
+                );
+
+                if (response.IsSuccessStatusCode)
                 {
-                    Content = JsonContent.Create(new { oobCode })
-                };
-                request.Headers.Add("X-Api-Key", _storageClient.ToString());
-
-                var response = await _httpClient.SendAsync(request);
-
-                if (!response.IsSuccessStatusCode)
+                    // Update the user's verification status in Firestore
+                    await UpdateUserVerificationStatus(oobCode);
+                    return (true, "Email verified successfully! You can now log in.");
+                }
+                else
                 {
                     var errorContent = await response.Content.ReadAsStringAsync();
-                    var errorJson = JObject.Parse(errorContent);
-                    var errorMessage = errorJson["error"]?["message"]?.ToString();
-
-                    if (errorMessage == "INVALID_OOB_CODE")
-                        return "Error: Invalid or expired verification link. Please request a new one.";
-
-                    return $"Error during verification: {errorMessage}";
+                    _logger.LogError($"Firebase verification error: {errorContent}");
+                    return (false, $"Verification failed: {errorContent}");
                 }
-
-                var content = await response.Content.ReadAsStringAsync();
-                var json = JObject.Parse(content);
-                string email = json["email"].ToString();
-
-                // Get user by email and update verification status
-                var user = await _firebaseAuth.GetUserByEmailAsync(email);
-                string userId = user.Uid;
-
-                // Check if user is already in Users collection
-                var existingUserDoc = await _firestoreDb.Collection("Users").Document(userId).GetSnapshotAsync();
-                if (existingUserDoc.Exists)
-                {
-                    return "Email already verified.";
-                }
-
-                // Get user data from PendingUsers
-                var pendingUserDoc = await _firestoreDb.Collection("PendingUsers").Document(userId).GetSnapshotAsync();
-                if (!pendingUserDoc.Exists)
-                {
-                    return "Error: User not found in pending state.";
-                }
-
-                var pendingUserData = pendingUserDoc.ToDictionary();
-                pendingUserData.Remove("verificationToken");
-                pendingUserData.Remove("tokenExpiration");
-                pendingUserData["verified"] = true;
-
-                // Move user data to Users collection
-                await _firestoreDb.Collection("Users").Document(userId).SetAsync(pendingUserData);
-
-                // Delete from PendingUsers collection
-                await _firestoreDb.Collection("PendingUsers").Document(userId).DeleteAsync();
-
-                return "Email verified successfully, and user data stored.";
             }
-            catch (FirebaseAuthException fae)
+            catch (HttpRequestException httpEx)
             {
-                Console.WriteLine($"Firebase Auth Exception: {fae.Message}");
-                return $"Error during verification: {fae.Message}";
+                _logger.LogError($"HTTP request error during email verification: {httpEx.Message}");
+                return (false, "An error occurred while verifying the email. Please try again later.");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Unexpected error during email verification: {ex}");
-                return $"Error during email verification: {ex.Message}";
+                _logger.LogError($"Unexpected error during email verification: {ex.Message}");
+                return (false, "An unexpected error occurred during verification.");
             }
+        }
+
+        private async Task UpdateUserVerificationStatus(string oobCode)
+        {
+            // Assuming you can retrieve the userId from the oobCode or a related mechanism
+            var userId = GetUserIdFromOobCode(oobCode); // Implement this method based on your needs
+
+            if (!string.IsNullOrEmpty(userId.ToString()))
+            {
+                var userDocRef = _firestoreDb.Collection("Users").Document(userId.ToString());
+                await userDocRef.UpdateAsync(new Dictionary<string, object>
+                {
+                    { "isVerified", true }
+                });
+            }
+            else
+            {
+                _logger.LogError("Failed to retrieve userId from oobCode for verification status update.");
+            }
+        }
+
+        private async Task<string> GetUserIdFromOobCode(string oobCode)
+        {
+            // Replace this with the actual method to fetch the user ID using the oobCode
+            var usersRef = _firestoreDb.Collection("Users");
+            var querySnapshot = await usersRef.WhereEqualTo("oobCode", oobCode).GetSnapshotAsync();
+
+            if (querySnapshot.Documents.Count > 0)
+            {
+                // Assuming the oobCode is stored in the user's document
+                var userDocument = querySnapshot.Documents.First();
+                return userDocument.Id; // Return the document ID (which is the user ID)
+            }
+
+            return null; // Return null if no user is found
         }
         public async Task SendVerificationEmailAsync(string email, string verificationLink)
         {
