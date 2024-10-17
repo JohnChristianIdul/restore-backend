@@ -90,39 +90,21 @@ namespace ReStore___backend.Services.Implementations
             try
             {
                 // Create user using Firebase Authentication
-                var auth = await _authProvider.CreateUserWithEmailAndPasswordAsync(email, password);
+                var auth = await FirebaseAuth.DefaultInstance.CreateUserAsync(new UserRecordArgs
+                {
+                    Email = email,
+                    EmailVerified = false,
+                    Password = password
+                });
 
                 // Get the user ID from the created user
-                string userId = auth.User.LocalId;
+                string userId = auth.Uid;
 
-                // Check email verification
-                var userRecord = new UserRecordArgs
-                {
-                    Email = $"{email}",
-                    EmailVerified = false
-                };
-
-                var verificationLink = await FirebaseAuth.DefaultInstance.GenerateEmailVerificationLinkAsync(userRecord.Email);
-
-                // Create an SMTP client                
-                var smtpClient = new SmtpClient("smtp.gmail.com")
-                {
-                    Port = 587,
-                    Credentials = new NetworkCredential($"{_smtpEmail}", $"{_smtpPassword}"),
-                    EnableSsl = true,
-                };
+                // Generate email verification link
+                var verificationLink = await FirebaseAuth.DefaultInstance.GenerateEmailVerificationLinkAsync(email);
 
                 // Send email verification
-                var emailMessage = new MailMessage
-                {
-                    From = new MailAddress($"{_smtpEmail}"),
-                    Subject = "Verify your email",
-                    Body = $"Please verify your email by clicking on this link: {verificationLink}",
-                    IsBodyHtml = true,
-                };
-
-                emailMessage.To.Add(email);
-                await smtpClient.SendMailAsync(emailMessage);
+                await SendVerificationEmailAsync(email, verificationLink);
 
                 // Create a document in Firestore to store additional user details
                 var userDoc = new Dictionary<string, object>
@@ -144,6 +126,27 @@ namespace ReStore___backend.Services.Implementations
             {
                 return $"Error during sign-up: {ex.Message}";
             }
+        }
+        private async Task SendVerificationEmailAsync(string email, string verificationLink)
+        {
+            var smtpClient = new SmtpClient("smtp.gmail.com")
+            {
+                Port = 587,
+                Credentials = new NetworkCredential(_smtpEmail, _smtpPassword),
+                EnableSsl = true,
+            };
+
+            var mailMessage = new MailMessage
+            {
+                From = new MailAddress(_smtpEmail),
+                Subject = "Verify your email",
+                Body = $"Please verify your email by clicking on this link: {verificationLink}",
+                IsBodyHtml = true,
+            };
+
+            mailMessage.To.Add(email);
+
+            await smtpClient.SendMailAsync(mailMessage);
         }
         public async Task<LoginResultDTO> Login(string email, string password)
         {
