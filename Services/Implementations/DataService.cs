@@ -84,9 +84,15 @@ namespace ReStore___backend.Services.Implementations
             var _firebaseID = Environment.GetEnvironmentVariable("FIREBASE_STORAGE_ID");
             _firestoreDb = FirestoreDb.Create(_firebaseID, firestoreClient);
         }
-
         public async Task<string> SignUp(string email, string name, string username, string phoneNumber, string password)
         {
+            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(name) ||
+                string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(phoneNumber) ||
+                string.IsNullOrWhiteSpace(password))
+            {
+                return "Error: All fields are required.";
+            }
+
             try
             {
                 // Create user using Firebase Authentication
@@ -94,7 +100,9 @@ namespace ReStore___backend.Services.Implementations
                 {
                     Email = email,
                     EmailVerified = false,
-                    Password = password
+                    Password = password,
+                    DisplayName = name,
+                    PhoneNumber = phoneNumber
                 });
 
                 // Get the user ID from the created user
@@ -108,13 +116,13 @@ namespace ReStore___backend.Services.Implementations
 
                 // Create a document in Firestore to store additional user details
                 var userDoc = new Dictionary<string, object>
-                {
-                    { "email", email },
-                    { "name", name },
-                    { "username", username },
-                    { "phone_number", phoneNumber },
-                    { "password", password }
-                };
+        {
+            { "email", email },
+            { "name", name },
+            { "username", username },
+            { "phone_number", phoneNumber }
+            // Remove storing of password in Firestore
+        };
 
                 // Store user details in Firestore under 'Users' collection with the user ID as the document ID
                 DocumentReference docRef = _firestoreDb.Collection("Users").Document(userId);
@@ -122,13 +130,23 @@ namespace ReStore___backend.Services.Implementations
 
                 return "User signed up successfully";
             }
+            catch (FirebaseAuthException fae)
+            {
+                return $"Error during Firebase authentication: {fae.Message}";
+            }
             catch (Exception ex)
             {
+                // Log the exception details here
                 return $"Error during sign-up: {ex.Message}";
             }
         }
         private async Task SendVerificationEmailAsync(string email, string verificationLink)
         {
+            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(verificationLink))
+            {
+                throw new ArgumentException("Email and verification link must be provided.");
+            }
+
             var smtpClient = new SmtpClient("smtp.gmail.com")
             {
                 Port = 587,
@@ -143,7 +161,6 @@ namespace ReStore___backend.Services.Implementations
                 Body = $"Please verify your email by clicking on this link: {verificationLink}",
                 IsBodyHtml = true,
             };
-
             mailMessage.To.Add(email);
 
             await smtpClient.SendMailAsync(mailMessage);
