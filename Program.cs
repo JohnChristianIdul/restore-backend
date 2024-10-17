@@ -4,7 +4,6 @@ using ReStore___backend.Services.Interfaces;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 var AllowMyOrigins = "_allowMyorigins";
-
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.

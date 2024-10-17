@@ -1,8 +1,9 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using FirebaseAdmin.Auth;
+using Microsoft.AspNetCore.Mvc;
 using ReStore___backend.Dtos;
 using ReStore___backend.Services.Interfaces;
-using System.Linq;
-using System.Threading.Tasks;
+using System.Net;
+using System.Net.Mail;
 
 namespace ReStore___backend.Controllers
 {
@@ -17,7 +18,7 @@ namespace ReStore___backend.Controllers
             _dataService = dataService;
         }
 
-        [HttpPost("/signup")]
+        [HttpPost("signup")]
         public async Task<IActionResult> SignUp([FromBody] SignUpDTO signUpDto)
         {
             if (signUpDto == null)
@@ -45,7 +46,7 @@ namespace ReStore___backend.Controllers
             }
         }
 
-        [HttpPost("/login")]
+        [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDTO loginDto)
         {
             if (loginDto == null)
@@ -67,6 +68,21 @@ namespace ReStore___backend.Controllers
             {
                 // Return an internal server error with the exception message
                 return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+            }
+        }
+
+        [HttpPost("sendPasswordResetEmail")]
+        public async Task<IActionResult> SendPasswordResetEmail([FromBody] string email)
+        {
+            try
+            {
+                var resetLink = await FirebaseAuth.DefaultInstance.GeneratePasswordResetLinkAsync(email);
+                await _dataService.SendPasswordResetEmailAsync(email, resetLink);
+                return Ok("Password reset email sent.");
+            }
+            catch (FirebaseAuthException ex)
+            {
+                return BadRequest($"Error: {ex.Message}");
             }
         }
 
