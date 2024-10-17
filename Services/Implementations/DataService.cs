@@ -86,65 +86,109 @@ namespace ReStore___backend.Services.Implementations
         }
         public async Task<string> SignUp(string email, string name, string username, string phoneNumber, string password)
         {
-            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(name) ||
-                string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(phoneNumber) ||
-                string.IsNullOrWhiteSpace(password))
-            {
-                return "Error: All fields are required.";
-            }
-
             try
             {
-                // Create user using Firebase Authentication
-                var auth = await FirebaseAuth.DefaultInstance.CreateUserAsync(new UserRecordArgs
+                // Input validation
+                if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(name) ||
+                    string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(phoneNumber) ||
+                    string.IsNullOrWhiteSpace(password))
                 {
-                    Email = email,
-                    EmailVerified = false,
-                    Password = password,
-                    DisplayName = name,
-                    PhoneNumber = phoneNumber
-                });
+                    return "Error: All fields are required.";
+                }
+
+                // Check Firebase initialization
+                if (FirebaseAuth.DefaultInstance == null)
+                {
+                    return "Error: Firebase Auth is not initialized.";
+                }
+
+                if (_firestoreDb == null)
+                {
+                    return "Error: Firestore is not initialized.";
+                }
+
+                // Create user using Firebase Authentication
+                UserRecord auth;
+                try
+                {
+                    auth = await FirebaseAuth.DefaultInstance.CreateUserAsync(new UserRecordArgs
+                    {
+                        Email = email,
+                        EmailVerified = false,
+                        Password = password,
+                        DisplayName = name,
+                        PhoneNumber = phoneNumber
+                    });
+                }
+                catch (FirebaseAuthException fae)
+                {
+                    return $"Error creating Firebase user: {fae.Message}";
+                }
 
                 // Get the user ID from the created user
                 string userId = auth.Uid;
-
+                Console.WriteLine($"Email : {_smtpEmail}, password : {_smtpPassword}");
                 // Generate email verification link
-                var verificationLink = await FirebaseAuth.DefaultInstance.GenerateEmailVerificationLinkAsync(email);
+                string verificationLink;
+                try
+                {
+                    verificationLink = await FirebaseAuth.DefaultInstance.GenerateEmailVerificationLinkAsync(email);
+                }
+                catch (FirebaseAuthException fae)
+                {
+                    return $"Error generating verification link: {fae.Message}";
+                }
 
                 // Send email verification
-                await SendVerificationEmailAsync(email, verificationLink);
+                try
+                {
+                    await SendVerificationEmailAsync(email, verificationLink);
+                }
+                catch (Exception ex)
+                {
+                    return $"Error sending verification email: {ex.Message}";
+                }
 
                 // Create a document in Firestore to store additional user details
                 var userDoc = new Dictionary<string, object>
-        {
-            { "email", email },
-            { "name", name },
-            { "username", username },
-            { "phone_number", phoneNumber }
-            // Remove storing of password in Firestore
-        };
+                {
+                    { "email", email },
+                    { "name", name },
+                    { "username", username },
+                    { "phone_number", phoneNumber }
+                };
 
-                // Store user details in Firestore under 'Users' collection with the user ID as the document ID
-                DocumentReference docRef = _firestoreDb.Collection("Users").Document(userId);
-                await docRef.SetAsync(userDoc);
+                // Store user details in Firestore
+                try
+                {
+                    DocumentReference docRef = _firestoreDb.Collection("Users").Document(userId);
+                    await docRef.SetAsync(userDoc);
+                }
+                catch (Exception ex)
+                {
+                    return $"Error storing user data in Firestore: {ex.Message}";
+                }
 
                 return "User signed up successfully";
             }
-            catch (FirebaseAuthException fae)
-            {
-                return $"Error during Firebase authentication: {fae.Message}";
-            }
             catch (Exception ex)
             {
-                // Log the exception details here
-                return $"Error during sign-up: {ex.Message}";
+                // Log the full exception details here
+                Console.WriteLine($"Unexpected error during sign-up: {ex}");
+                return $"Unexpected error during sign-up: {ex.Message}";
             }
         }
+
         private async Task SendVerificationEmailAsync(string email, string verificationLink)
         {
             if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(verificationLink))
             {
                 throw new ArgumentException("Email and verification link must be provided.");
+            }
+
+            if (string.IsNullOrWhiteSpace(_smtpEmail) || string.IsNullOrWhiteSpace(_smtpPassword))
+            {
+                throw new InvalidOperationException("SMTP credentials are not properly configured.");
             }
 
             var smtpClient = new SmtpClient("smtp.gmail.com")
