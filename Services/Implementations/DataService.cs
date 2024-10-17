@@ -100,6 +100,10 @@ namespace ReStore___backend.Services.Implementations
                     return "Error: Firebase Auth is not initialized.";
                 }
 
+                // Generate email verification link and send email
+                string verificationLink = await FirebaseAuth.DefaultInstance.GenerateEmailVerificationLinkAsync(email);
+                await SendVerificationEmailAsync(email, verificationLink);
+
                 // Create the user in Firebase Authentication
                 var authResult = await _authProvider.CreateUserWithEmailAndPasswordAsync(email, password, name, true);
                 var user = authResult.User;
@@ -108,10 +112,6 @@ namespace ReStore___backend.Services.Implementations
                 {
                     return "Error: Failed to create user.";
                 }
-
-                // Generate email verification link and send email
-                string verificationLink = await FirebaseAuth.DefaultInstance.GenerateEmailVerificationLinkAsync(email);
-                await SendVerificationEmailAsync(email, verificationLink);
 
                 return "User created successfully. Please verify your email before proceeding.";
             }
