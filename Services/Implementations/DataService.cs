@@ -16,6 +16,7 @@ using FirebaseAdmin.Auth;
 using System.Net.Mail;
 using System.Net;
 using FirebaseAdmin;
+using System.Security.Cryptography;
 
 namespace ReStore___backend.Services.Implementations
 {
@@ -91,42 +92,62 @@ namespace ReStore___backend.Services.Implementations
                     return "Error: All fields are required.";
                 }
 
+                // Check if there's an existing pending registration
+                var pendingUserQuery = await _firestoreDb.Collection("PendingUsers")
+                    .WhereEqualTo("email", email)
+                    .GetSnapshotAsync();
+
+                if (pendingUserQuery.Count > 0)
+                {
+                    // Delete existing pending registration
+                    await _firestoreDb.Collection("PendingUsers").Document(pendingUserQuery.Documents[0].Id).DeleteAsync();
+                }
+
+                // Check if the email is already registered in Users collection
+                var existingUserQuery = await _firestoreDb.Collection("Users")
+                    .WhereEqualTo("email", email)
+                    .GetSnapshotAsync();
+
+                if (existingUserQuery.Count > 0)
+                {
+                    return "Error: This email is already registered.";
+                }
+
                 // Create the user in Firebase Authentication
-                var authResult = await FirebaseAuth.DefaultInstance.CreateUserAsync(new UserRecordArgs
+                var authResult = await _firebaseAuth.CreateUserAsync(new UserRecordArgs
                 {
                     Email = email,
                     Password = password,
                     DisplayName = name
                 });
 
-                // Temporarily save user data
+                // Generate a custom token for email verification
+                string verificationToken = GenerateVerificationToken();
+                DateTime expirationTime = DateTime.UtcNow.AddMinutes(5);
+
+                // Save user data in PendingUsers collection
                 var pendingUserDoc = new Dictionary<string, object>
-            {
-                { "email", email },
-                { "name", name },
-                { "username", username },
-                { "phone_number", phoneNumber },
-                { "password", password },
-                { "verified", false }
-            };
+                {
+                    { "email", email },
+                    { "name", name },
+                    { "username", username },
+                    { "phone_number", phoneNumber },
+                    { "verified", false },
+                    { "verificationToken", verificationToken },
+                    { "tokenExpiration", Timestamp.FromDateTime(expirationTime) }
+                };
                 await _firestoreDb.Collection("PendingUsers").Document(authResult.Uid).SetAsync(pendingUserDoc);
 
+                // Generate verification link with custom token
+                string verificationLink = $"https://yourdomain.com/verify-email?token={verificationToken}&userId={authResult.Uid}";
+
                 // Send the email verification link
-                string verificationLink = await FirebaseAuth.DefaultInstance.GenerateEmailVerificationLinkAsync(email);
                 await SendVerificationEmailAsync(email, verificationLink);
 
-                return "User created successfully. Please verify your email to complete the sign-up process.";
+                return "User created successfully. Please verify your email within 5 minutes to complete the sign-up process.";
             }
             catch (FirebaseAuthException fae)
             {
-                if (fae.Message.Contains("EMAIL_EXISTS"))
-                {
-                    return "Error: This email is already registered.";
-                }
-                if (fae.Message.Contains("TOO_MANY_ATTEMPTS_TRY_LATER"))
-                {
-                    return "Error: Too many attempts. Please try again later.";
-                }
                 Console.WriteLine($"Firebase Auth Exception: {fae.Message}");
                 return $"Error during sign-up: {fae.Message}";
             }
@@ -143,31 +164,48 @@ namespace ReStore___backend.Services.Implementations
             Console.WriteLine($"EmailVerified status for user {userId}: {userRecord.EmailVerified}");
             return userRecord.EmailVerified;
         }
-        public async Task<string> VerifyEmail(string oobCode, string userId)
+        public async Task<string> VerifyEmail(string token, string userId)
         {
             try
             {
-                var userRecord = await FirebaseAuth.DefaultInstance.GetUserAsync(userId);
-                if (userRecord == null)
-                {
-                    return "Error: User not found.";
-                }
-
-                if (userRecord.EmailVerified)
-                {
-                    return "Email is already verified.";
-                }
-
                 var pendingUserDoc = await _firestoreDb.Collection("PendingUsers").Document(userId).GetSnapshotAsync();
                 if (!pendingUserDoc.Exists)
                 {
                     return "Error: User not found in pending state.";
                 }
 
-                var userDoc = pendingUserDoc.ToDictionary();
-                userDoc["verified"] = true;
+                var pendingUserData = pendingUserDoc.ToDictionary();
+                string storedToken = pendingUserData["verificationToken"].ToString();
+                Timestamp expirationTimestamp = (Timestamp)pendingUserData["tokenExpiration"];
 
-                await _firestoreDb.Collection("Users").Document(userId).SetAsync(userDoc);
+                if (token != storedToken)
+                {
+                    return "Error: Invalid verification token.";
+                }
+
+                if (expirationTimestamp.ToDateTime() < DateTime.UtcNow)
+                {
+                    return "Error: Verification link has expired. Please request a new one.";
+                }
+
+                // Mark the user as verified in Firebase Authentication
+                var userRecord = await _firebaseAuth.GetUserAsync(userId);
+                var userArgs = new UserRecordArgs
+                {
+                    Uid = userId,
+                    EmailVerified = true
+                };
+                await _firebaseAuth.UpdateUserAsync(userArgs);
+
+                // Remove sensitive data before migrating to Users collection
+                pendingUserData.Remove("verificationToken");
+                pendingUserData.Remove("tokenExpiration");
+                pendingUserData["verified"] = true;
+
+                // Migrate data to Users collection
+                await _firestoreDb.Collection("Users").Document(userId).SetAsync(pendingUserData);
+
+                // Delete data from PendingUsers collection
                 await _firestoreDb.Collection("PendingUsers").Document(userId).DeleteAsync();
 
                 return "Email verified successfully, and user data stored.";
@@ -221,7 +259,64 @@ namespace ReStore___backend.Services.Implementations
                 Console.WriteLine($"Unexpected error during email sending: {ex}");
                 throw new InvalidOperationException("Unexpected error sending verification email: " + ex.Message);
             }
-        }        public async Task<LoginResultDTO> Login(string email, string password)
+        }
+        public async Task<string> ResendVerificationEmail(string email)
+        {
+            try
+            {
+                // Check if there's a pending registration for this email
+                var pendingUserQuery = await _firestoreDb.Collection("PendingUsers")
+                    .WhereEqualTo("email", email)
+                    .GetSnapshotAsync();
+
+                if (pendingUserQuery.Count == 0)
+                {
+                    return "Error: No pending registration found for this email.";
+                }
+
+                var pendingUserDoc = pendingUserQuery.Documents[0];
+                string userId = pendingUserDoc.Id;
+
+                // Generate a new verification token
+                string newVerificationToken = GenerateVerificationToken();
+                DateTime newExpirationTime = DateTime.UtcNow.AddMinutes(5);
+
+                // Update the pending user document with the new token and expiration time
+                await _firestoreDb.Collection("PendingUsers").Document(userId).UpdateAsync(new Dictionary<string, object>
+                {
+                    { "verificationToken", newVerificationToken },
+                    { "tokenExpiration", Timestamp.FromDateTime(newExpirationTime) }
+                });
+
+                // Generate new verification link with custom token
+                string newVerificationLink = $"https://yourdomain.com/verify-email?token={newVerificationToken}&userId={userId}";
+
+                // Send the new verification email
+                await SendVerificationEmailAsync(email, newVerificationLink);
+
+                return "Verification email resent successfully. Please verify your email within 5 minutes.";
+            }
+            catch (FirebaseAuthException fae)
+            {
+                Console.WriteLine($"Firebase Auth Exception: {fae.Message}");
+                return $"Error resending verification email: {fae.Message}";
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Unexpected error resending verification email: {ex}");
+                return $"Unexpected error resending verification email: {ex.Message}";
+            }
+        }
+        private string GenerateVerificationToken()
+        {
+            using (var rng = new RNGCryptoServiceProvider())
+            {
+                var tokenData = new byte[32];
+                rng.GetBytes(tokenData);
+                return Convert.ToBase64String(tokenData);
+            }
+        }
+        public async Task<LoginResultDTO> Login(string email, string password)
         {
             try
             {
