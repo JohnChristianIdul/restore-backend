@@ -167,52 +167,21 @@ namespace ReStore___backend.Services.Implementations
         {
             try
             {
-                var pendingUserDoc = await _firestoreDb.Collection("PendingUsers").Document(userId).GetSnapshotAsync();
-                if (!pendingUserDoc.Exists)
+                // Prepare the request to the Cloud Function
+                string cloudFunctionUrl = $"https://us-central1-{_projectId}.cloudfunctions.net/verifyEmail?token={token}&userId={userId}";
+
+                using (var client = new HttpClient())
                 {
-                    return "Error: User not found in pending state.";
+                    var response = await client.GetAsync(cloudFunctionUrl);
+                    response.EnsureSuccessStatusCode(); // Throws if the status code is not success
+
+                    return await response.Content.ReadAsStringAsync();
                 }
-
-                var pendingUserData = pendingUserDoc.ToDictionary();
-                string storedToken = pendingUserData["verificationToken"].ToString();
-                Timestamp expirationTimestamp = (Timestamp)pendingUserData["tokenExpiration"];
-
-                if (token != storedToken)
-                {
-                    return "Error: Invalid verification token.";
-                }
-
-                if (expirationTimestamp.ToDateTime() < DateTime.UtcNow)
-                {
-                    return "Error: Verification link has expired. Please request a new one.";
-                }
-
-                // Mark the user as verified in Firebase Authentication
-                var userRecord = await _firebaseAuth.GetUserAsync(userId);
-                var userArgs = new UserRecordArgs
-                {
-                    Uid = userId,
-                    EmailVerified = true
-                };
-                await _firebaseAuth.UpdateUserAsync(userArgs);
-
-                // Remove sensitive data before migrating to Users collection
-                pendingUserData.Remove("verificationToken");
-                pendingUserData.Remove("tokenExpiration");
-                pendingUserData["verified"] = true;
-
-                // Migrate data to Users collection
-                await _firestoreDb.Collection("Users").Document(userId).SetAsync(pendingUserData);
-
-                // Delete data from PendingUsers collection
-                await _firestoreDb.Collection("PendingUsers").Document(userId).DeleteAsync();
-
-                return "Email verified successfully, and user data stored.";
             }
-            catch (FirebaseAuthException ex)
+            catch (HttpRequestException httpEx)
             {
-                Console.WriteLine($"Firebase Auth Error during verification: {ex.Message}");
-                return $"Error during verification: {ex.Message}";
+                Console.WriteLine($"HTTP Request error during email verification: {httpEx.Message}");
+                return $"Error during email verification: {httpEx.Message}";
             }
             catch (Exception ex)
             {
