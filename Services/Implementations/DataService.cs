@@ -125,15 +125,8 @@ namespace ReStore___backend.Services.Implementations
                     DisplayName = name
                 });
 
-                // Create ActionCodeSettings for the verification link
-                var actionCodeSettings = new ActionCodeSettings
-                {
-                    Url = $"{_renderUrl}/verify-email",
-                    HandleCodeInApp = true
-                };
-
-                // Generate email verification link without exposing the API key
-                string verificationLink = await _firebaseAuth.GenerateEmailVerificationLinkAsync(email, actionCodeSettings);
+                // Generate email verification link
+                string verificationLink = await _firebaseAuth.GenerateEmailVerificationLinkAsync(email);
 
                 // Save user data in PendingUsers collection
                 var pendingUserDoc = new Dictionary<string, object>
@@ -143,7 +136,7 @@ namespace ReStore___backend.Services.Implementations
                     { "username", username },
                     { "phone_number", phoneNumber },
                     { "verified", false },
-                    { "verificationLink", verificationLink }
+                    { "verificationLink", verificationLink },
                 };
                 await _firestoreDb.Collection("PendingUsers").Document(authResult.Uid).SetAsync(pendingUserDoc);
 
