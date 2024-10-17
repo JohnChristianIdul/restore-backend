@@ -89,16 +89,13 @@ namespace ReStore___backend.Controllers
         [HttpGet("verify-email")]
         public async Task<IActionResult> VerifyEmail(string oobCode)
         {
-            // Call the existing VerifyEmail method, passing the oobCode
-            var verificationResult = await VerifyEmail(oobCode);
+            string verificationResult = await _dataService.VerifyEmail(oobCode);
 
-            if (verificationResult.StartsWith("Error"))
+            if (!string.IsNullOrEmpty(verificationResult) && verificationResult.StartsWith("Error"))
             {
-                // Handle errors, e.g., show an error page or message
                 return BadRequest(verificationResult);
             }
 
-            // Optionally, redirect to a success page or return a success message
             return Ok("Email verified successfully! You can now log in.");
         }
     }
