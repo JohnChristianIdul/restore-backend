@@ -260,8 +260,17 @@ namespace ReStore___backend.Services.Implementations
                 // Authenticate user with Firebase Auth
                 var auth = await _authProvider.SignInWithEmailAndPasswordAsync(email, password);
 
-                // Check if the email is verified
-                if (!await IsEmailVerified(auth.User.Email))
+                if (auth.User == null)
+                {
+                    return new LoginResultDTO
+                    {
+                        Token = null,
+                        Username = null,
+                        ErrorMessage = "Authentication failed. Please check your email and password."
+                    };
+                }
+
+                if (!await IsEmailVerified(auth.User.LocalId))
                 {
                     return new LoginResultDTO
                     {
@@ -271,16 +280,13 @@ namespace ReStore___backend.Services.Implementations
                     };
                 }
 
-                // Ensure Firestore is initialized
                 if (_firestoreDb == null)
                 {
                     throw new InvalidOperationException("Firestore service is not initialized.");
                 }
 
-                // Retrieve the authenticated user's ID
                 var userId = auth.User.LocalId;
 
-                // Fetch user data from Firestore or your chosen database
                 var userDoc = await _firestoreDb.Collection("Users").Document(userId).GetSnapshotAsync();
 
                 if (!userDoc.Exists)
@@ -304,7 +310,6 @@ namespace ReStore___backend.Services.Implementations
             catch (Exception ex)
             {
                 Console.WriteLine($"Login failed: {ex.Message}");
-                // Handle error and return a message
                 return new LoginResultDTO
                 {
                     Token = null,
