@@ -261,6 +261,11 @@ namespace ReStore___backend.Services.Implementations
                 throw new InvalidOperationException("Unexpected error sending verification email: " + ex.Message);
             }
         }
+        private async Task<bool> IsEmailVerified(string userId)
+        {
+            var user = await _authProvider.GetUserAsync(userId);
+            return user?.IsEmailVerified ?? false;
+        }
         public async Task<LoginResultDTO> Login(string email, string password)
         {
             try
@@ -274,19 +279,24 @@ namespace ReStore___backend.Services.Implementations
                 // Authenticate user with Firebase Auth
                 var auth = await _authProvider.SignInWithEmailAndPasswordAsync(email, password);
 
-                // Check if the authentication result or user is null
-                if (auth == null || auth.User == null)
+                // Check if the email is verified
+                if (!auth.User.IsEmailVerified)
                 {
-                    return new LoginResultDTO
+                    // Optionally, refresh user information
+                    await auth.User.ReloadAsync(); // Reload to get the latest verification state
+                    if (!auth.User.IsEmailVerified)
                     {
-                        Token = null,
-                        Username = null,
-                        ErrorMessage = "Authentication failed. Please check your credentials."
-                    };
+                        return new LoginResultDTO
+                        {
+                            Token = null,
+                            Username = null,
+                            ErrorMessage = "Email is not verified. Please verify your email before logging in."
+                        };
+                    }
                 }
 
                 // Check if the email is verified
-                if (!auth.User.IsEmailVerified)
+                if (!await IsEmailVerified(auth.User.LocalId))
                 {
                     return new LoginResultDTO
                     {
