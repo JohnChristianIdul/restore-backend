@@ -143,6 +143,7 @@ namespace ReStore___backend.Services.Implementations
         public async Task<bool> IsEmailVerified(string userId)
         {
             var userRecord = await FirebaseAuth.DefaultInstance.GetUserAsync(userId);
+            Console.WriteLine($"EmailVerified status for user {userId}: {userRecord.EmailVerified}");
             return userRecord.EmailVerified;
         }
 
@@ -150,26 +151,29 @@ namespace ReStore___backend.Services.Implementations
         {
             try
             {
-                // Check if the email is verified
                 var isVerified = await IsEmailVerified(userId);
                 if (!isVerified)
                 {
                     return "Error: Email not verified.";
                 }
 
-                // Move user data from PendingUsers to Users
                 var pendingUserDoc = await _firestoreDb.Collection("PendingUsers").Document(userId).GetSnapshotAsync();
                 if (!pendingUserDoc.Exists)
                 {
                     return "Error: User not found in pending state.";
                 }
 
+                // Copy data to Users collection and mark as verified
                 var userDoc = pendingUserDoc.ToDictionary();
-                userDoc["verified"] = true;
+                userDoc["verified"] = true;  // Update the verification status
 
+                // Save the user to the Users collection
                 await _firestoreDb.Collection("Users").Document(userId).SetAsync(userDoc);
+
+                // Remove the user from the PendingUsers collection
                 await _firestoreDb.Collection("PendingUsers").Document(userId).DeleteAsync();
 
+                Console.WriteLine($"User {userId} has been verified and moved to the Users collection.");
                 return "Email verified and user data stored.";
             }
             catch (Exception ex)
@@ -178,7 +182,6 @@ namespace ReStore___backend.Services.Implementations
                 return $"Unexpected error during email verification: {ex.Message}";
             }
         }
-
         public async Task SendVerificationEmailAsync(string email, string verificationLink)
         {
             if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(verificationLink))
