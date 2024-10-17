@@ -88,11 +88,11 @@ namespace ReStore___backend.Services.Implementations
             _firestoreDb = FirestoreDb.Create(_firebaseID, firestoreClient);
             _firebaseAuth = FirebaseAuth.DefaultInstance;
         }
+
         public async Task<string> SignUp(string email, string name, string username, string phoneNumber, string password)
         {
             try
             {
-                // Input validation
                 if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(name) ||
                     string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(phoneNumber) ||
                     string.IsNullOrWhiteSpace(password))
@@ -100,29 +100,24 @@ namespace ReStore___backend.Services.Implementations
                     return "Error: All fields are required.";
                 }
 
-                // Check if the email is already registered
                 var existingUserQuery = await _firestoreDb.Collection("Users")
                     .WhereEqualTo("email", email)
                     .GetSnapshotAsync();
-
                 if (existingUserQuery.Count > 0)
                 {
                     return "Error: This email is already registered.";
                 }
 
-                // Create the user in Firebase Authentication
-                var authResult = await _firebaseAuth.CreateUserAsync(new UserRecordArgs
+                var authResult = await FirebaseAuth.DefaultInstance.CreateUserAsync(new UserRecordArgs
                 {
                     Email = email,
                     Password = password,
                     DisplayName = name
                 });
 
-                // Send email verification link
                 string verificationLink = await _firebaseAuth.GenerateEmailVerificationLinkAsync(email);
                 await SendVerificationEmailAsync(email, verificationLink);
 
-                // Save user data to the Firestore Users collection (with 'verified' set to false initially)
                 var userDoc = new Dictionary<string, object>
                 {
                     { "email", email },
@@ -137,12 +132,12 @@ namespace ReStore___backend.Services.Implementations
             }
             catch (FirebaseAuthException fae)
             {
-                Console.WriteLine($"Firebase Auth Exception: {fae.Message}");
+                _logger.LogError($"Firebase Auth Exception: {fae.Message}");
                 return $"Error during sign-up: {fae.Message}";
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Unexpected error during sign-up: {ex}");
+                _logger.LogError($"Unexpected error during sign-up: {ex.Message}");
                 return $"Unexpected error during sign-up: {ex.Message}";
             }
         }
@@ -164,8 +159,6 @@ namespace ReStore___backend.Services.Implementations
 
                 if (response.IsSuccessStatusCode)
                 {
-                    // Update the user's verification status in Firestore
-                    await UpdateUserVerificationStatus(oobCode);
                     return (true, "Email verified successfully! You can now log in.");
                 }
                 else
@@ -187,41 +180,28 @@ namespace ReStore___backend.Services.Implementations
             }
         }
 
-        public async Task<string> UpdateUserVerificationStatus(string oobCode)
-        {
-            // Retrieve the userId from the oobCode
-            var userId = GetUserIdFromOobCode(oobCode); // Implement this method based on your needs
-
-            if (!string.IsNullOrEmpty(userId.ToString()))
-            {
-                var userDocRef = _firestoreDb.Collection("Users").Document(userId.ToString());
-                await userDocRef.UpdateAsync(new Dictionary<string, object>
-                {
-                    { "isVerified", true }
-                });
-                return "User verification status updated successfully.";
-            }
-            else
-            {
-                _logger.LogError("Failed to retrieve userId from oobCode for verification status update.");
-                return "Error: Unable to update user verification status.";
-            }
-        }
         private async Task<string> GetUserIdFromOobCode(string oobCode)
         {
-            // Replace this with the actual method to fetch the user ID using the oobCode
-            var usersRef = _firestoreDb.Collection("Users");
-            var querySnapshot = await usersRef.WhereEqualTo("oobCode", oobCode).GetSnapshotAsync();
-
-            if (querySnapshot.Documents.Count > 0)
+            try
             {
-                // Assuming the oobCode is stored in the user's document
-                var userDocument = querySnapshot.Documents.First();
-                return userDocument.Id; // Return the document ID (which is the user ID)
-            }
+                var usersRef = _firestoreDb.Collection("Users");
+                var querySnapshot = await usersRef.WhereEqualTo("oobCode", oobCode).GetSnapshotAsync();
 
-            return null; // Return null if no user is found
+                if (querySnapshot.Documents.Count > 0)
+                {
+                    var userDocument = querySnapshot.Documents.First();
+                    return userDocument.Id; // Return the document ID (which is the user ID)
+                }
+
+                return null; // Return null if no user is found
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error fetching user ID from oobCode: {ex.Message}");
+                return null;
+            }
         }
+
         public async Task SendVerificationEmailAsync(string email, string verificationLink)
         {
             if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(verificationLink))
@@ -231,7 +211,7 @@ namespace ReStore___backend.Services.Implementations
 
             try
             {
-                var smtpClient = new SmtpClient("smtp.gmail.com")
+                using var smtpClient = new SmtpClient("smtp.gmail.com")
                 {
                     Port = 587,
                     Credentials = new NetworkCredential(_smtpEmail, _smtpPassword),
@@ -249,15 +229,16 @@ namespace ReStore___backend.Services.Implementations
                 mailMessage.To.Add(email);
 
                 await smtpClient.SendMailAsync(mailMessage);
+                _logger.LogInformation($"Verification email sent to {email}.");
             }
             catch (SmtpException smtpEx)
             {
-                Console.WriteLine($"SMTP error during email sending: {smtpEx}");
+                _logger.LogError($"SMTP error during email sending: {smtpEx.Message}");
                 throw new InvalidOperationException("Error sending verification email: " + smtpEx.Message);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Unexpected error during email sending: {ex}");
+                _logger.LogError($"Unexpected error during email sending: {ex.Message}");
                 throw new InvalidOperationException("Unexpected error sending verification email: " + ex.Message);
             }
         }
@@ -278,22 +259,6 @@ namespace ReStore___backend.Services.Implementations
 
                 // Authenticate user with Firebase Auth
                 var auth = await _authProvider.SignInWithEmailAndPasswordAsync(email, password);
-
-                // Check if the email is verified
-                if (!auth.User.IsEmailVerified)
-                {
-                    // Optionally, refresh user information
-                    await auth.User.ReloadAsync(); // Reload to get the latest verification state
-                    if (!auth.User.IsEmailVerified)
-                    {
-                        return new LoginResultDTO
-                        {
-                            Token = null,
-                            Username = null,
-                            ErrorMessage = "Email is not verified. Please verify your email before logging in."
-                        };
-                    }
-                }
 
                 // Check if the email is verified
                 if (!await IsEmailVerified(auth.User.LocalId))
