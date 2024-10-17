@@ -138,8 +138,7 @@ namespace ReStore___backend.Services.Implementations
                 };
                 await _firestoreDb.Collection("PendingUsers").Document(authResult.Uid).SetAsync(pendingUserDoc);
 
-                // Generate verification link with custom token
-                string verificationLink = $"https://yourdomain.com/verify-email?token={verificationToken}&userId={authResult.Uid}";
+                string verificationLink = await _firebaseAuth.GenerateEmailVerificationLinkAsync(email);
 
                 // Send the email verification link
                 await SendVerificationEmailAsync(email, verificationLink);
