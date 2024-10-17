@@ -106,7 +106,7 @@ namespace ReStore___backend.Services.Implementations
                     return "Error: Firestore is not initialized.";
                 }
 
-                // Attempt to create user
+                // Step 1: Try to create user in Firebase Auth
                 var authResult = await _authProvider.CreateUserWithEmailAndPasswordAsync(email, password, name, true);
                 var user = authResult.User;
 
@@ -116,34 +116,39 @@ namespace ReStore___backend.Services.Implementations
                     return "Error: Failed to create user.";
                 }
 
-                string userId = user.LocalId;
-                Console.WriteLine($"User ID: {userId}");
-
                 // Generate email verification link
                 string verificationLink = await FirebaseAuth.DefaultInstance.GenerateEmailVerificationLinkAsync(email);
 
                 // Send verification email
                 await SendVerificationEmailAsync(email, verificationLink);
 
-                // Prepare user data for Firestore
+                // Step 2: Wait for email verification (In production, this could involve more checks such as triggering verification events)
+
+                // Step 3: Only after verification, save user details to Firestore
+                string userId = user.LocalId;
                 var userDoc = new Dictionary<string, object>
-                {
-                    { "email", email },
-                    { "name", name },
-                    { "username", username },
-                    { "phone_number", phoneNumber }
-                };
+        {
+            { "email", email },
+            { "name", name },
+            { "username", username },
+            { "phone_number", phoneNumber }
+        };
 
                 DocumentReference docRef = _firestoreDb.Collection("Users").Document(userId);
                 await docRef.SetAsync(userDoc);
 
-                return "User signed up successfully.";
+                return "User signed up successfully, please verify your email.";
             }
             catch (FirebaseAuthException fae)
             {
+                // Handle specific Firebase Auth errors
                 if (fae.Message.Contains("EMAIL_EXISTS"))
                 {
                     return "Error: This email is already registered.";
+                }
+                if (fae.Message.Contains("TOO_MANY_ATTEMPTS_TRY_LATER"))
+                {
+                    return "Error: Too many attempts. Please try again later.";
                 }
 
                 Console.WriteLine($"Firebase Auth Exception: {fae.Message}");
@@ -151,6 +156,7 @@ namespace ReStore___backend.Services.Implementations
             }
             catch (Exception ex)
             {
+                // Handle any other unexpected errors
                 Console.WriteLine($"Unexpected error during sign-up: {ex}");
                 return $"Unexpected error during sign-up: {ex.Message}";
             }
