@@ -261,7 +261,7 @@ namespace ReStore___backend.Services.Implementations
                 var auth = await _authProvider.SignInWithEmailAndPasswordAsync(email, password);
 
                 // Check if the email is verified
-                if (!await IsEmailVerified(auth.User.LocalId))
+                if (!await IsEmailVerified(auth.User.Email))
                 {
                     return new LoginResultDTO
                     {
