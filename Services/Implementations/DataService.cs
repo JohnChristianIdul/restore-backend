@@ -204,7 +204,7 @@ namespace ReStore___backend.Services.Implementations
                 pendingUserData.Remove("tokenExpiration");
                 pendingUserData["verified"] = true;
 
-                // Move the user data to Users collection
+                // Move the user data to the Users collection
                 await _firestoreDb.Collection("Users").Document(userId).SetAsync(pendingUserData);
 
                 // Delete the pending user data
