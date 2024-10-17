@@ -157,11 +157,13 @@ namespace ReStore___backend.Services.Implementations
         {
             try
             {
-                // Verify the email using the oobCode
-                var response = await _httpClient.PostAsync(
-                    $"https://identitytoolkit.googleapis.com/v1/accounts:update?key={_storageClient}",
-                    JsonContent.Create(new { oobCode })
-                );
+                var request = new HttpRequestMessage(HttpMethod.Post, "https://identitytoolkit.googleapis.com/v1/accounts:update")
+                {
+                    Content = JsonContent.Create(new { oobCode })
+                };
+                request.Headers.Add("X-Api-Key", _storageClient.ToString());
+
+                var response = await _httpClient.SendAsync(request);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -179,18 +181,18 @@ namespace ReStore___backend.Services.Implementations
                 var json = JObject.Parse(content);
                 string email = json["email"].ToString();
 
-                // Get the user by email
+                // Get user by email and update verification status
                 var user = await _firebaseAuth.GetUserByEmailAsync(email);
                 string userId = user.Uid;
 
-                // Check if the user is already in the Users collection
+                // Check if user is already in Users collection
                 var existingUserDoc = await _firestoreDb.Collection("Users").Document(userId).GetSnapshotAsync();
                 if (existingUserDoc.Exists)
                 {
                     return "Email already verified.";
                 }
 
-                // Get the user data from PendingUsers
+                // Get user data from PendingUsers
                 var pendingUserDoc = await _firestoreDb.Collection("PendingUsers").Document(userId).GetSnapshotAsync();
                 if (!pendingUserDoc.Exists)
                 {
@@ -198,16 +200,14 @@ namespace ReStore___backend.Services.Implementations
                 }
 
                 var pendingUserData = pendingUserDoc.ToDictionary();
-
-                // Remove verification-specific fields
                 pendingUserData.Remove("verificationToken");
                 pendingUserData.Remove("tokenExpiration");
                 pendingUserData["verified"] = true;
 
-                // Move the user data to the Users collection
+                // Move user data to Users collection
                 await _firestoreDb.Collection("Users").Document(userId).SetAsync(pendingUserData);
 
-                // Delete the pending user data
+                // Delete from PendingUsers collection
                 await _firestoreDb.Collection("PendingUsers").Document(userId).DeleteAsync();
 
                 return "Email verified successfully, and user data stored.";
