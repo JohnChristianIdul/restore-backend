@@ -93,51 +93,48 @@ namespace ReStore___backend.Controllers
                 return BadRequest($"Error: {ex.Message}");
             }
         }
-
         [HttpGet("verify-email")]
         public async Task<IActionResult> VerifyEmail(string oobCode)
         {
             _logger.LogInformation($"Received oobCode: {oobCode}");
 
-            if (string.IsNullOrEmpty(oobCode))
+            // Validate the input
+            if (string.IsNullOrWhiteSpace(oobCode))
             {
                 _logger.LogError("No oobCode received");
-                return BadRequest("Verification code is missing.");
+                return BadRequest(new { error = "Verification code is missing." });
             }
 
             try
             {
-                // Call to Firebase to verify the email using the oobCode without exposing the API key in the URL.
-                var firebaseResponse = await _httpClient.PostAsync(
-                    "https://identitytoolkit.googleapis.com/v1/accounts:update",
-                    JsonContent.Create(new { oobCode })  // Only passing the oobCode here
-                );
+                // Send the oobCode to Firebase for verification
+                var (success, message) = await _dataService.VerifyEmail(oobCode);
 
-                if (!firebaseResponse.IsSuccessStatusCode)
+                // If verification was unsuccessful, return the error
+                if (!success)
                 {
-                    var errorContent = await firebaseResponse.Content.ReadAsStringAsync();
-                    _logger.LogError($"Firebase error: {errorContent}");
-                    return BadRequest($"Verification failed: {errorContent}");
+                    _logger.LogError($"Firebase verification failed: {message}");
+                    return BadRequest(new { error = $"Verification failed: {message}" });
                 }
 
-                // If successful, handle Firestore user update (if needed)
-                string verificationResult = await _dataService.VerifyEmail(oobCode);
+                // Optionally update the user record in Firestore
+                // Here, you would call a method to update the user's verification status in Firestore
+                // Assuming you have a method like `UpdateUserVerificationStatus`
+                var firestoreUpdateResult = await _dataService.UpdateUserVerificationStatus(oobCode);
 
-                _logger.LogInformation($"Verification result: {verificationResult}");
-
-                if (!string.IsNullOrEmpty(verificationResult) && verificationResult.StartsWith("Error"))
+                if (!string.IsNullOrEmpty(firestoreUpdateResult) && firestoreUpdateResult.StartsWith("Error"))
                 {
-                    return BadRequest(verificationResult);
+                    return BadRequest(new { error = firestoreUpdateResult });
                 }
 
-                return Ok("Email verified successfully! You can now log in.");
+                // Successful verification response
+                return Ok(new { message = "Email verified successfully! You can now log in." });
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Exception during verification: {ex.Message}");
-                return StatusCode(500, "An error occurred during verification.");
+                _logger.LogError($"Exception during email verification: {ex.Message}");
+                return StatusCode(StatusCodes.Status500InternalServerError, new { error = "An error occurred during verification." });
             }
         }
-
     }
 }

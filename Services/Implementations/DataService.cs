@@ -187,9 +187,9 @@ namespace ReStore___backend.Services.Implementations
             }
         }
 
-        private async Task UpdateUserVerificationStatus(string oobCode)
+        public async Task<string> UpdateUserVerificationStatus(string oobCode)
         {
-            // Assuming you can retrieve the userId from the oobCode or a related mechanism
+            // Retrieve the userId from the oobCode
             var userId = GetUserIdFromOobCode(oobCode); // Implement this method based on your needs
 
             if (!string.IsNullOrEmpty(userId.ToString()))
@@ -199,13 +199,14 @@ namespace ReStore___backend.Services.Implementations
                 {
                     { "isVerified", true }
                 });
+                return "User verification status updated successfully.";
             }
             else
             {
                 _logger.LogError("Failed to retrieve userId from oobCode for verification status update.");
+                return "Error: Unable to update user verification status.";
             }
         }
-
         private async Task<string> GetUserIdFromOobCode(string oobCode)
         {
             // Replace this with the actual method to fetch the user ID using the oobCode
