@@ -86,6 +86,7 @@ namespace ReStore___backend.Services.Implementations
         {
             try
             {
+                // Input validation
                 if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(name) ||
                     string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(phoneNumber) ||
                     string.IsNullOrWhiteSpace(password))
@@ -93,31 +94,38 @@ namespace ReStore___backend.Services.Implementations
                     return "Error: All fields are required.";
                 }
 
+                // Check if Firebase Auth provider is initialized
                 if (_authProvider == null)
                 {
                     return "Error: Firebase Auth is not initialized.";
                 }
 
+                // Check if Firestore is initialized
                 if (_firestoreDb == null)
                 {
                     return "Error: Firestore is not initialized.";
                 }
 
+                // Attempt to create user
                 var authResult = await _authProvider.CreateUserWithEmailAndPasswordAsync(email, password, name, true);
                 var user = authResult.User;
 
+                // If user creation failed, return an error
                 if (user == null)
                 {
                     return "Error: Failed to create user.";
                 }
 
                 string userId = user.LocalId;
-                Console.WriteLine($"Email : {_smtpEmail}, password : {_smtpPassword}");
+                Console.WriteLine($"User ID: {userId}");
 
+                // Generate email verification link
                 string verificationLink = await FirebaseAuth.DefaultInstance.GenerateEmailVerificationLinkAsync(email);
 
+                // Send verification email
                 await SendVerificationEmailAsync(email, verificationLink);
 
+                // Prepare user data for Firestore
                 var userDoc = new Dictionary<string, object>
                 {
                     { "email", email },
@@ -129,10 +137,15 @@ namespace ReStore___backend.Services.Implementations
                 DocumentReference docRef = _firestoreDb.Collection("Users").Document(userId);
                 await docRef.SetAsync(userDoc);
 
-                return "User signed up successfully";
+                return "User signed up successfully.";
             }
             catch (FirebaseAuthException fae)
             {
+                if (fae.Message.Contains("EMAIL_EXISTS"))
+                {
+                    return "Error: This email is already registered.";
+                }
+
                 Console.WriteLine($"Firebase Auth Exception: {fae.Message}");
                 return $"Error during sign-up: {fae.Message}";
             }
