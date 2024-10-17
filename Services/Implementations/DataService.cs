@@ -261,13 +261,13 @@ namespace ReStore___backend.Services.Implementations
                 var auth = await _authProvider.SignInWithEmailAndPasswordAsync(email, password);
 
                 // Check if the email is verified
-                if (!await IsEmailVerified(auth.User.LocalId))
+                if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
                 {
                     return new LoginResultDTO
                     {
                         Token = null,
                         Username = null,
-                        ErrorMessage = "Email is not verified. Please verify your email before logging in."
+                        ErrorMessage = "Email and password must not be empty."
                     };
                 }
 
@@ -303,6 +303,7 @@ namespace ReStore___backend.Services.Implementations
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"Login failed: {ex.Message}");
                 // Handle error and return a message
                 return new LoginResultDTO
                 {
