@@ -30,6 +30,7 @@ namespace ReStore___backend.Services.Implementations
         private readonly string _bucketName;
         private readonly string _projectId;
         private readonly string _apiUrl;
+        private readonly string _renderUrl;
         private readonly string _location;
         private readonly string _endpointId;
         private readonly string _credentials;
@@ -45,6 +46,7 @@ namespace ReStore___backend.Services.Implementations
             _credentials = "/etc/secrets/GOOGLE_APPLICATION_CREDENTIALS";
             _smtpPassword = Environment.GetEnvironmentVariable("SMTP_EMAIL_PASSWORD");
             _smtpEmail = Environment.GetEnvironmentVariable("SMTP_EMAIL");
+            _renderUrl = Environment.GetEnvironmentVariable("API_URL_RENDER");
 
             // Load credentials from file explicitly
             GoogleCredential credential;
@@ -122,8 +124,8 @@ namespace ReStore___backend.Services.Implementations
                     DisplayName = name
                 });
 
-                // Generate email verification link
-                string verificationLink = await _firebaseAuth.GenerateEmailVerificationLinkAsync(email);
+                // Generate email verification link without exposing the API key
+                string verificationLink = await _firebaseAuth.GenerateEmailVerificationLinkAsync(email, ActionCodeSettings);
 
                 // Save user data in PendingUsers collection
                 var pendingUserDoc = new Dictionary<string, object>
@@ -136,6 +138,13 @@ namespace ReStore___backend.Services.Implementations
                     { "verificationLink", verificationLink }
                 };
                 await _firestoreDb.Collection("PendingUsers").Document(authResult.Uid).SetAsync(pendingUserDoc);
+
+                // Define ActionCodeSettings for email verification link
+                var actionCodeSettings = new ActionCodeSettings
+                {
+                    Url = $"{_renderUrl}/verify-email",
+                    HandleCodeInApp = true
+                };
 
                 // Send the email verification link
                 await SendVerificationEmailAsync(email, verificationLink);
