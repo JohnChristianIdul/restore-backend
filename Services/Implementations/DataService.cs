@@ -17,6 +17,7 @@ using System.Net.Mail;
 using System.Net;
 using FirebaseAdmin;
 using System.Security.Cryptography;
+using Newtonsoft.Json.Linq;
 
 namespace ReStore___backend.Services.Implementations
 {
@@ -138,6 +139,7 @@ namespace ReStore___backend.Services.Implementations
                 };
                 await _firestoreDb.Collection("PendingUsers").Document(authResult.Uid).SetAsync(pendingUserDoc);
 
+                // Generate email verification link
                 string verificationLink = await _firebaseAuth.GenerateEmailVerificationLinkAsync(email);
 
                 // Send the email verification link
@@ -163,25 +165,69 @@ namespace ReStore___backend.Services.Implementations
             Console.WriteLine($"EmailVerified status for user {userId}: {userRecord.EmailVerified}");
             return userRecord.EmailVerified;
         }
-        public async Task<string> VerifyEmail(string token, string userId)
+        public async Task<string> VerifyEmail(string oobCode)
         {
             try
             {
-                // Prepare the request to the Cloud Function
-                string cloudFunctionUrl = $"https://us-central1-{_projectId}.cloudfunctions.net/verifyEmail?token={token}&userId={userId}";
+                // Use Firebase Auth REST API to verify the email
+                var response = await _httpClient.PostAsync(
+                    $"https://identitytoolkit.googleapis.com/v1/accounts:update?key={_storageClient}",
+                    JsonContent.Create(new { oobCode })
+                );
 
-                using (var client = new HttpClient())
+                if (!response.IsSuccessStatusCode)
                 {
-                    var response = await client.GetAsync(cloudFunctionUrl);
-                    response.EnsureSuccessStatusCode(); // Throws if the status code is not success
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    var errorJson = JObject.Parse(errorContent);
+                    var errorMessage = errorJson["error"]?["message"]?.ToString();
 
-                    return await response.Content.ReadAsStringAsync();
+                    if (errorMessage == "INVALID_OOB_CODE")
+                        return "Error: Invalid or expired verification link. Please request a new one.";
+
+                    return $"Error during verification: {errorMessage}";
                 }
+
+                var content = await response.Content.ReadAsStringAsync();
+                var json = JObject.Parse(content);
+                string email = json["email"].ToString();
+
+                // Get the user by email
+                var user = await _firebaseAuth.GetUserByEmailAsync(email);
+                string userId = user.Uid;
+
+                // Check if the user is already in the Users collection
+                var existingUserDoc = await _firestoreDb.Collection("Users").Document(userId).GetSnapshotAsync();
+                if (existingUserDoc.Exists)
+                {
+                    return "Email already verified.";
+                }
+
+                // Get the user data from PendingUsers
+                var pendingUserDoc = await _firestoreDb.Collection("PendingUsers").Document(userId).GetSnapshotAsync();
+                if (!pendingUserDoc.Exists)
+                {
+                    return "Error: User not found in pending state.";
+                }
+
+                var pendingUserData = pendingUserDoc.ToDictionary();
+
+                // Remove verification-specific fields
+                pendingUserData.Remove("verificationToken");
+                pendingUserData.Remove("tokenExpiration");
+                pendingUserData["verified"] = true;
+
+                // Move the user data to Users collection
+                await _firestoreDb.Collection("Users").Document(userId).SetAsync(pendingUserData);
+
+                // Delete the pending user data
+                await _firestoreDb.Collection("PendingUsers").Document(userId).DeleteAsync();
+
+                return "Email verified successfully, and user data stored.";
             }
-            catch (HttpRequestException httpEx)
+            catch (FirebaseAuthException fae)
             {
-                Console.WriteLine($"HTTP Request error during email verification: {httpEx.Message}");
-                return $"Error during email verification: {httpEx.Message}";
+                Console.WriteLine($"Firebase Auth Exception: {fae.Message}");
+                return $"Error during verification: {fae.Message}";
             }
             catch (Exception ex)
             {
@@ -245,19 +291,14 @@ namespace ReStore___backend.Services.Implementations
                 var pendingUserDoc = pendingUserQuery.Documents[0];
                 string userId = pendingUserDoc.Id;
 
-                // Generate a new verification token
-                string newVerificationToken = GenerateVerificationToken();
-                DateTime newExpirationTime = DateTime.UtcNow.AddMinutes(5);
+                // Generate a new verification link
+                string newVerificationLink = await _firebaseAuth.GenerateEmailVerificationLinkAsync(email);
 
-                // Update the pending user document with the new token and expiration time
+                // Update the pending user document with a new expiration time
                 await _firestoreDb.Collection("PendingUsers").Document(userId).UpdateAsync(new Dictionary<string, object>
-                {
-                    { "verificationToken", newVerificationToken },
-                    { "tokenExpiration", Timestamp.FromDateTime(newExpirationTime) }
-                });
-
-                // Generate new verification link with custom token
-                string newVerificationLink = $"https://yourdomain.com/verify-email?token={newVerificationToken}&userId={userId}";
+            {
+                { "tokenExpiration", Timestamp.FromDateTime(DateTime.UtcNow.AddMinutes(5)) }
+            });
 
                 // Send the new verification email
                 await SendVerificationEmailAsync(email, newVerificationLink);
@@ -275,9 +316,10 @@ namespace ReStore___backend.Services.Implementations
                 return $"Unexpected error resending verification email: {ex.Message}";
             }
         }
+
         private string GenerateVerificationToken()
         {
-            using (var rng = new RNGCryptoServiceProvider())
+            using (var rng = new System.Security.Cryptography.RNGCryptoServiceProvider())
             {
                 var tokenData = new byte[32];
                 rng.GetBytes(tokenData);
@@ -290,17 +332,6 @@ namespace ReStore___backend.Services.Implementations
             {
                 // Authenticate user with Firebase Auth
                 var auth = await _authProvider.SignInWithEmailAndPasswordAsync(email, password);
-
-                // Check if the user's email is verified
-                if (!auth.User.IsEmailVerified)
-                {
-                    return new LoginResultDTO
-                    {
-                        Token = null,
-                        Username = null,
-                        ErrorMessage = "Email not verified. Please verify your email before logging in."
-                    };
-                }
 
                 // Retrieve the authenticated user's ID
                 var userId = auth.User.LocalId;
