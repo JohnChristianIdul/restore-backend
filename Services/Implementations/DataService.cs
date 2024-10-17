@@ -18,6 +18,7 @@ using System.Net;
 using FirebaseAdmin;
 using System.Security.Cryptography;
 using Newtonsoft.Json.Linq;
+using Restore_backend_deployment_.DTO_s;
 
 namespace ReStore___backend.Services.Implementations
 {
@@ -124,8 +125,15 @@ namespace ReStore___backend.Services.Implementations
                     DisplayName = name
                 });
 
+                // Create ActionCodeSettings for the verification link
+                var actionCodeSettings = new ActionCodeSettings
+                {
+                    Url = $"{_renderUrl}/verify-email",
+                    HandleCodeInApp = true
+                };
+
                 // Generate email verification link without exposing the API key
-                string verificationLink = await _firebaseAuth.GenerateEmailVerificationLinkAsync(email, ActionCodeSettings);
+                string verificationLink = await _firebaseAuth.GenerateEmailVerificationLinkAsync(email, actionCodeSettings);
 
                 // Save user data in PendingUsers collection
                 var pendingUserDoc = new Dictionary<string, object>
@@ -138,13 +146,6 @@ namespace ReStore___backend.Services.Implementations
                     { "verificationLink", verificationLink }
                 };
                 await _firestoreDb.Collection("PendingUsers").Document(authResult.Uid).SetAsync(pendingUserDoc);
-
-                // Define ActionCodeSettings for email verification link
-                var actionCodeSettings = new ActionCodeSettings
-                {
-                    Url = $"{_renderUrl}/verify-email",
-                    HandleCodeInApp = true
-                };
 
                 // Send the email verification link
                 await SendVerificationEmailAsync(email, verificationLink);
@@ -162,6 +163,7 @@ namespace ReStore___backend.Services.Implementations
                 return $"Unexpected error during sign-up: {ex.Message}";
             }
         }
+
         public async Task<string> VerifyEmail(string oobCode)
         {
             try
