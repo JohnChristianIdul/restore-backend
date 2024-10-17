@@ -12,14 +12,9 @@ using Newtonsoft.Json;
 using System.Net.Http.Headers;
 using System.Text;
 using static ReStore___backend.Dtos.DemandPredictionDTO;
-using System.IO;
 using FirebaseAdmin.Auth;
 using System.Net.Mail;
-using Microsoft.AspNetCore.Identity;
-using System.Net.NetworkInformation;
 using System.Net;
-using static Google.Rpc.Help.Types;
-using System.Xml.Linq;
 using FirebaseAdmin;
 
 namespace ReStore___backend.Services.Implementations
@@ -38,6 +33,7 @@ namespace ReStore___backend.Services.Implementations
         private readonly string _credentials;
         private readonly string _smtpEmail;
         private readonly string _smtpPassword;
+        private readonly FirebaseAuth _firebaseAuth;
 
         public DataService()
         {
@@ -81,6 +77,7 @@ namespace ReStore___backend.Services.Implementations
             var firestoreClient = firestoreClientBuilder.Build();
             var _firebaseID = Environment.GetEnvironmentVariable("FIREBASE_STORAGE_ID");
             _firestoreDb = FirestoreDb.Create(_firebaseID, firestoreClient);
+            _firebaseAuth = FirebaseAuth.DefaultInstance;
         }
         public async Task<string> SignUp(string email, string name, string username, string phoneNumber, string password)
         {
@@ -104,14 +101,14 @@ namespace ReStore___backend.Services.Implementations
 
                 // Temporarily save user data
                 var pendingUserDoc = new Dictionary<string, object>
-                {
-                    { "email", email },
-                    { "name", name },
-                    { "username", username },
-                    { "phone_number", phoneNumber },
-                    { "password", password },
-                    { "verified", false }
-                };
+            {
+                { "email", email },
+                { "name", name },
+                { "username", username },
+                { "phone_number", phoneNumber },
+                { "password", password },
+                { "verified", false }
+            };
                 await _firestoreDb.Collection("PendingUsers").Document(authResult.Uid).SetAsync(pendingUserDoc);
 
                 // Send the email verification link
@@ -146,40 +143,57 @@ namespace ReStore___backend.Services.Implementations
             Console.WriteLine($"EmailVerified status for user {userId}: {userRecord.EmailVerified}");
             return userRecord.EmailVerified;
         }
-
-        public async Task<string> VerifyEmail(string userId)
+        public async Task<string> VerifyEmail(string oobCode, string userId)
         {
             try
             {
-                var isVerified = await IsEmailVerified(userId);
-                if (!isVerified)
+                // Validate the oobCode (the one-time token)
+                var decodedToken = await FirebaseAuth.DefaultInstance.VerifyIdTokenAsync(oobCode);
+
+                if (decodedToken == null || decodedToken.Uid != userId)
                 {
-                    return "Error: Email not verified.";
+                    return "Error: Invalid verification token.";
                 }
 
+                // Check if email is already verified
+                var userRecord = await FirebaseAuth.DefaultInstance.GetUserAsync(userId);
+                if (userRecord.EmailVerified)
+                {
+                    return "Email is already verified.";
+                }
+
+                // Mark email as verified
+                await FirebaseAuth.DefaultInstance.UpdateUserAsync(new UserRecordArgs
+                {
+                    Uid = userId,
+                    EmailVerified = true
+                });
+
+                // Retrieve the pending user data
                 var pendingUserDoc = await _firestoreDb.Collection("PendingUsers").Document(userId).GetSnapshotAsync();
                 if (!pendingUserDoc.Exists)
                 {
                     return "Error: User not found in pending state.";
                 }
 
-                // Copy data to Users collection and mark as verified
+                // Move user to the "Users" collection
                 var userDoc = pendingUserDoc.ToDictionary();
-                userDoc["verified"] = true;  // Update the verification status
+                userDoc["verified"] = true;
 
-                // Save the user to the Users collection
                 await _firestoreDb.Collection("Users").Document(userId).SetAsync(userDoc);
-
-                // Remove the user from the PendingUsers collection
                 await _firestoreDb.Collection("PendingUsers").Document(userId).DeleteAsync();
 
-                Console.WriteLine($"User {userId} has been verified and moved to the Users collection.");
-                return "Email verified and user data stored.";
+                return "Email verified successfully, and user data stored.";
+            }
+            catch (FirebaseAuthException ex)
+            {
+                Console.WriteLine($"Firebase Auth Error during verification: {ex.Message}");
+                return $"Error during verification: {ex.Message}";
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Unexpected error during email verification: {ex}");
-                return $"Unexpected error during email verification: {ex.Message}";
+                return $"Error during email verification: {ex.Message}";
             }
         }
         public async Task SendVerificationEmailAsync(string email, string verificationLink)
@@ -220,8 +234,7 @@ namespace ReStore___backend.Services.Implementations
                 Console.WriteLine($"Unexpected error during email sending: {ex}");
                 throw new InvalidOperationException("Unexpected error sending verification email: " + ex.Message);
             }
-        }
-        public async Task<LoginResultDTO> Login(string email, string password)
+        }        public async Task<LoginResultDTO> Login(string email, string password)
         {
             try
             {
