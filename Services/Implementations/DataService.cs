@@ -120,13 +120,13 @@ namespace ReStore___backend.Services.Implementations
 
                 // Save user data to the Firestore Users collection (with 'verified' set to false initially)
                 var userDoc = new Dictionary<string, object>
-        {
-            { "email", email },
-            { "name", name },
-            { "username", username },
-            { "phone_number", phoneNumber },
-            { "verified", false } // initially not verified
-        };
+                {
+                    { "email", email },
+                    { "name", name },
+                    { "username", username },
+                    { "phone_number", phoneNumber },
+                    { "password", password }
+                };
                 await _firestoreDb.Collection("Users").Document(authResult.Uid).SetAsync(userDoc);
 
                 return "User created successfully. Please verify your email to complete the sign-up process.";

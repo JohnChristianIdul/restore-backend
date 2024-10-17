@@ -63,15 +63,18 @@ namespace ReStore___backend.Controllers
                 // Call service method for login, which now returns a LoginResultDTO
                 var loginResult = await _dataService.Login(loginDto.Email, loginDto.Password);
 
-                // Check if there was an error during login
-                if (loginResult.Token.StartsWith("Error"))
-                    return Unauthorized(new { error = loginResult.Token });
+                // Check if there was an error during login using ErrorMessage
+                if (!string.IsNullOrEmpty(loginResult.ErrorMessage))
+                    return Unauthorized(new { error = loginResult.ErrorMessage });
 
                 // Return the token and username from the LoginResultDTO
                 return Ok(new { token = loginResult.Token, username = loginResult.Username });
             }
             catch (Exception ex)
             {
+                // Log the exception for debugging
+                Console.WriteLine($"Unexpected error during login: {ex}");
+
                 // Return an internal server error with the exception message
                 return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
             }
