@@ -89,17 +89,13 @@ namespace ReStore___backend.Controllers
         [HttpPost("verifyEmail")]
         public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailDTO verifyEmailDto)
         {
-            if (verifyEmailDto == null || string.IsNullOrWhiteSpace(verifyEmailDto.UserId) || string.IsNullOrWhiteSpace(verifyEmailDto.OobCode))
+            if (verifyEmailDto == null || string.IsNullOrWhiteSpace(verifyEmailDto.UserId) || string.IsNullOrWhiteSpace(verifyEmailDto.Token))
                 return BadRequest(new { error = "Invalid verification data." });
-
             try
             {
-                // Call the service method to verify email using both the oobCode and userId
-                var result = await _dataService.VerifyEmail(verifyEmailDto.OobCode, verifyEmailDto.UserId);
-
+                var result = await _dataService.VerifyEmail(verifyEmailDto.Token);
                 if (result.StartsWith("Error"))
                     return BadRequest(new { error = result });
-
                 return Ok(new { message = result });
             }
             catch (Exception ex)
