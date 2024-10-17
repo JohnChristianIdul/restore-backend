@@ -1,4 +1,5 @@
-﻿using FirebaseAdmin.Auth;
+﻿using Firebase.Auth.Objects;
+using FirebaseAdmin.Auth;
 using Google.Cloud.Firestore;
 using Microsoft.AspNetCore.Mvc;
 using ReStore___backend.Dtos;
@@ -51,35 +52,41 @@ namespace ReStore___backend.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
             }
         }
-
         [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] LoginDTO loginDto)
+        public async Task<IActionResult> Login(string email, string password)
         {
-            if (loginDto == null)
-                return BadRequest(new { error = "Invalid login data." });
+            // Validate inputs
+            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+            {
+                return BadRequest(new { error = "Email and password are required." });
+            }
 
             try
             {
-                // Call service method for login, which now returns a LoginResultDTO
-                var loginResult = await _dataService.Login(loginDto.Email, loginDto.Password);
+                // Use DataService to handle the login logic
+                var loginResult = await _dataService.Login(email, password);
 
-                // Check if there was an error during login using ErrorMessage
+                // Check if there was an error (like unverified email)
                 if (!string.IsNullOrEmpty(loginResult.ErrorMessage))
-                    return Unauthorized(new { error = loginResult.ErrorMessage });
+                {
+                    // Return the error message from LoginResultDTO, including "Email is not verified"
+                    return BadRequest(new { error = loginResult.ErrorMessage });
+                }
 
-                // Return the token and username from the LoginResultDTO
-                return Ok(new { token = loginResult.Token, username = loginResult.Username });
+                // Successful login response with token and username
+                return Ok(new
+                {
+                    message = "Login successful!",
+                    token = loginResult.Token,
+                    username = loginResult.Username
+                });
             }
             catch (Exception ex)
             {
-                // Log the exception for debugging
-                Console.WriteLine($"Unexpected error during login: {ex}");
-
-                // Return an internal server error with the exception message
-                return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+                _logger.LogError($"Exception during login: {ex.Message}");
+                return StatusCode(StatusCodes.Status500InternalServerError, new { error = "An error occurred during login." });
             }
         }
-
         [HttpPost("sendPasswordResetEmail")]
         public async Task<IActionResult> SendPasswordResetEmail([FromBody] string email)
         {
@@ -108,27 +115,24 @@ namespace ReStore___backend.Controllers
             try
             {
                 // Send the oobCode to Firebase for verification
-                var (success, message) = await _dataService.VerifyEmail(oobCode);
+                var verificationResult = await _dataService.VerifyEmail(oobCode);
 
                 // If verification was unsuccessful, return the error
-                if (!success)
+                if (!verificationResult.success)
                 {
-                    _logger.LogError($"Firebase verification failed: {message}");
-                    return BadRequest(new { error = $"Verification failed: {message}" });
+                    _logger.LogError($"Firebase verification failed: {verificationResult.message}");
+                    return BadRequest(new { error = $"Verification failed: {verificationResult.message}" });
                 }
 
-                // Optionally update the user record in Firestore
-                // Here, you would call a method to update the user's verification status in Firestore
-                // Assuming you have a method like `UpdateUserVerificationStatus`
+                // Update the user record in Firestore to mark as verified
                 var firestoreUpdateResult = await _dataService.UpdateUserVerificationStatus(oobCode);
-
-                if (!string.IsNullOrEmpty(firestoreUpdateResult) && firestoreUpdateResult.StartsWith("Error"))
+                if (firestoreUpdateResult.StartsWith("Error"))
                 {
                     return BadRequest(new { error = firestoreUpdateResult });
                 }
 
                 // Successful verification response
-                return Ok(new { message = "Email verified successfully! You can now log in." });
+                return Ok(new { message = "Your email has been verified. You can now sign in with your new account." });
             }
             catch (Exception ex)
             {
