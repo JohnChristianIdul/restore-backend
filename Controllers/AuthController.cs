@@ -8,7 +8,6 @@ using System.Net.Mail;
 namespace ReStore___backend.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
     public class AuthController : ControllerBase
     {
         private readonly IDataService _dataService;
