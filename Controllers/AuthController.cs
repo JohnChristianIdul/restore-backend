@@ -123,13 +123,6 @@ namespace ReStore___backend.Controllers
                     return BadRequest(new { error = $"Verification failed: {verificationResult.message}" });
                 }
 
-                // Update the user record in Firestore to mark as verified
-                var firestoreUpdateResult = await _dataService.UpdateUserVerificationStatus(oobCode);
-                if (firestoreUpdateResult.StartsWith("Error"))
-                {
-                    return BadRequest(new { error = firestoreUpdateResult });
-                }
-
                 // Successful verification response
                 return Ok(new { message = "Your email has been verified. You can now sign in with your new account." });
             }
