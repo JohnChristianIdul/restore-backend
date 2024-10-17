@@ -20,6 +20,7 @@ using System.Net.NetworkInformation;
 using System.Net;
 using static Google.Rpc.Help.Types;
 using System.Xml.Linq;
+using FirebaseAdmin;
 
 namespace ReStore___backend.Services.Implementations
 {
@@ -40,19 +41,10 @@ namespace ReStore___backend.Services.Implementations
 
         public DataService()
         {
-            // Configure URL and HTTP client
             _httpClient = new HttpClient();
-
-            // Firebase API key from INI file
             string firebaseApiKey = Environment.GetEnvironmentVariable("FIREBASE_API_KEY");
-
-            // Cloud Storage Bucket
             _bucketName = Environment.GetEnvironmentVariable("FIREBASE_BUCKET_NAME");
-
-            // Retrieve Google Application Credentials from Environment Variable
             _credentials = "/etc/secrets/GOOGLE_APPLICATION_CREDENTIALS";
-
-            // Set support email
             _smtpPassword = Environment.GetEnvironmentVariable("SMTP_EMAIL_PASSWORD");
             _smtpEmail = Environment.GetEnvironmentVariable("SMTP_EMAIL");
 
@@ -69,6 +61,12 @@ namespace ReStore___backend.Services.Implementations
             {
                 _authProvider = new FirebaseAuthProvider(new FirebaseConfig(firebaseApiKey));
                 Console.WriteLine("Firebase Auth initialized successfully");
+
+                FirebaseApp.Create(new AppOptions()
+                {
+                    Credential = GoogleCredential.FromFile(_credentials)
+                });
+                Console.WriteLine("FirebaseApp initialized successfully");
             }
             catch (Exception ex)
             {
@@ -88,7 +86,6 @@ namespace ReStore___backend.Services.Implementations
         {
             try
             {
-                // Input validation
                 if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(name) ||
                     string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(phoneNumber) ||
                     string.IsNullOrWhiteSpace(password))
@@ -96,8 +93,7 @@ namespace ReStore___backend.Services.Implementations
                     return "Error: All fields are required.";
                 }
 
-                // Check Firebase initialization
-                if (FirebaseAuth.DefaultInstance == null)
+                if (_authProvider == null)
                 {
                     return "Error: Firebase Auth is not initialized.";
                 }
@@ -107,49 +103,21 @@ namespace ReStore___backend.Services.Implementations
                     return "Error: Firestore is not initialized.";
                 }
 
-                // Create user using Firebase Authentication
-                UserRecord auth;
-                try
+                var authResult = await _authProvider.CreateUserWithEmailAndPasswordAsync(email, password, name, true);
+                var user = authResult.User;
+
+                if (user == null)
                 {
-                    auth = await FirebaseAuth.DefaultInstance.CreateUserAsync(new UserRecordArgs
-                    {
-                        Email = email,
-                        EmailVerified = false,
-                        Password = password,
-                        DisplayName = name,
-                        PhoneNumber = phoneNumber
-                    });
-                }
-                catch (FirebaseAuthException fae)
-                {
-                    return $"Error creating Firebase user: {fae.Message}";
+                    return "Error: Failed to create user.";
                 }
 
-                // Get the user ID from the created user
-                string userId = auth.Uid;
+                string userId = user.LocalId;
                 Console.WriteLine($"Email : {_smtpEmail}, password : {_smtpPassword}");
-                // Generate email verification link
-                string verificationLink;
-                try
-                {
-                    verificationLink = await FirebaseAuth.DefaultInstance.GenerateEmailVerificationLinkAsync(email);
-                }
-                catch (FirebaseAuthException fae)
-                {
-                    return $"Error generating verification link: {fae.Message}";
-                }
 
-                // Send email verification
-                try
-                {
-                    await SendVerificationEmailAsync(email, verificationLink);
-                }
-                catch (Exception ex)
-                {
-                    return $"Error sending verification email: {ex.Message}";
-                }
+                string verificationLink = await FirebaseAuth.DefaultInstance.GenerateEmailVerificationLinkAsync(email);
 
-                // Create a document in Firestore to store additional user details
+                await SendVerificationEmailAsync(email, verificationLink);
+
                 var userDoc = new Dictionary<string, object>
                 {
                     { "email", email },
@@ -158,27 +126,22 @@ namespace ReStore___backend.Services.Implementations
                     { "phone_number", phoneNumber }
                 };
 
-                // Store user details in Firestore
-                try
-                {
-                    DocumentReference docRef = _firestoreDb.Collection("Users").Document(userId);
-                    await docRef.SetAsync(userDoc);
-                }
-                catch (Exception ex)
-                {
-                    return $"Error storing user data in Firestore: {ex.Message}";
-                }
+                DocumentReference docRef = _firestoreDb.Collection("Users").Document(userId);
+                await docRef.SetAsync(userDoc);
 
                 return "User signed up successfully";
             }
+            catch (FirebaseAuthException fae)
+            {
+                Console.WriteLine($"Firebase Auth Exception: {fae.Message}");
+                return $"Error during sign-up: {fae.Message}";
+            }
             catch (Exception ex)
             {
-                // Log the full exception details here
                 Console.WriteLine($"Unexpected error during sign-up: {ex}");
                 return $"Unexpected error during sign-up: {ex.Message}";
             }
         }
-
         private async Task SendVerificationEmailAsync(string email, string verificationLink)
         {
             if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(verificationLink))
