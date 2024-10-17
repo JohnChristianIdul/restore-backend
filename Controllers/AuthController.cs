@@ -1,7 +1,9 @@
 ﻿using FirebaseAdmin.Auth;
+using Google.Cloud.Firestore;
 using Microsoft.AspNetCore.Mvc;
 using ReStore___backend.Dtos;
 using ReStore___backend.Services.Interfaces;
+using Restore_backend_deployment_.DTO_s;
 using System.Net;
 using System.Net.Mail;
 
@@ -83,6 +85,39 @@ namespace ReStore___backend.Controllers
                 return BadRequest($"Error: {ex.Message}");
             }
         }
+
+        [HttpPost("verifyEmail")]
+        public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailDTO verifyEmailDto)
+        {
+            if (verifyEmailDto == null || string.IsNullOrWhiteSpace(verifyEmailDto.UserId))
+                return BadRequest(new { error = "Invalid verification data." });
+
+            try
+            {
+                // Check if the email is verified
+                var isVerified = await _dataService.IsEmailVerified(verifyEmailDto.UserId);
+                if (!isVerified)
+                    return BadRequest(new { error = "Email not verified." });
+
+                // Move user data from PendingUsers to Users
+                var pendingUserDoc = await _firestoreDb.Collection("PendingUsers").Document(verifyEmailDto.UserId).GetSnapshotAsync();
+                if (!pendingUserDoc.Exists)
+                    return BadRequest(new { error = "User not found in pending state." });
+
+                var userDoc = pendingUserDoc.ToDictionary();
+                userDoc["verified"] = true;
+
+                await _firestoreDb.Collection("Users").Document(verifyEmailDto.UserId).SetAsync(userDoc);
+                await _firestoreDb.Collection("PendingUsers").Document(verifyEmailDto.UserId).DeleteAsync();
+
+                return Ok(new { message = "Email verified and user data stored." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+            }
+        }
+
 
     }
 }
