@@ -81,8 +81,7 @@ namespace ReStore___backend.Services.Implementations
             var firestoreClient = firestoreClientBuilder.Build();
             var _firebaseID = Environment.GetEnvironmentVariable("FIREBASE_STORAGE_ID");
             _firestoreDb = FirestoreDb.Create(_firebaseID, firestoreClient);
-        }
-        public async Task<string> SignUp(string email, string name, string username, string phoneNumber, string password)
+        }        public async Task<string> SignUp(string email, string name, string username, string phoneNumber, string password)
         {
             try
             {
@@ -138,13 +137,11 @@ namespace ReStore___backend.Services.Implementations
                 return $"Unexpected error during sign-up: {ex.Message}";
             }
         }
-
-        public async Task<bool> isEmailVerified(string userId)
+        public async Task<bool> IsEmailVerified(string userId)
         {
             var userRecord = await FirebaseAuth.DefaultInstance.GetUserAsync(userId);
             return userRecord.EmailVerified;
         }
-
         public async Task SendVerificationEmailAsync(string email, string verificationLink)
         {
             if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(verificationLink))
@@ -223,23 +220,28 @@ namespace ReStore___backend.Services.Implementations
                 // Handle error and return a message
                 return new LoginResultDTO
                 {
-                    Token = $"Error during login: {ex.Message}",
-                    Username = null
+                    Token = null,
+                    Username = null,
+                    ErrorMessage = $"Error during login: {ex.Message}"
                 };
             }
         }
-        public async Task SendPasswordResetEmailAsync(string email, string resetLink)
+        public async Task SendPasswordResetEmailAsync(string email)
         {
+            // Generate password reset link
+            var resetLink = await FirebaseAuth.DefaultInstance.GeneratePasswordResetLinkAsync(email);
+
+            // Send reset email
             var smtpClient = new SmtpClient("smtp.gmail.com")
             {
                 Port = 587,
-                Credentials = new NetworkCredential($"{_smtpEmail}", $"{_smtpPassword}"),
+                Credentials = new NetworkCredential(_smtpEmail, _smtpPassword),
                 EnableSsl = true,
             };
 
             var emailMessage = new MailMessage
             {
-                From = new MailAddress($"{_smtpEmail}"),
+                From = new MailAddress(_smtpEmail),
                 Subject = "Reset your password",
                 Body = $"Click the following link to reset your password: {resetLink}",
                 IsBodyHtml = true,
