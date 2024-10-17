@@ -147,36 +147,23 @@ namespace ReStore___backend.Services.Implementations
         {
             try
             {
-                // Validate the oobCode (the one-time token)
-                var decodedToken = await FirebaseAuth.DefaultInstance.VerifyIdTokenAsync(oobCode);
-
-                if (decodedToken == null || decodedToken.Uid != userId)
+                var userRecord = await FirebaseAuth.DefaultInstance.GetUserAsync(userId);
+                if (userRecord == null)
                 {
-                    return "Error: Invalid verification token.";
+                    return "Error: User not found.";
                 }
 
-                // Check if email is already verified
-                var userRecord = await FirebaseAuth.DefaultInstance.GetUserAsync(userId);
                 if (userRecord.EmailVerified)
                 {
                     return "Email is already verified.";
                 }
 
-                // Mark email as verified
-                await FirebaseAuth.DefaultInstance.UpdateUserAsync(new UserRecordArgs
-                {
-                    Uid = userId,
-                    EmailVerified = true
-                });
-
-                // Retrieve the pending user data
                 var pendingUserDoc = await _firestoreDb.Collection("PendingUsers").Document(userId).GetSnapshotAsync();
                 if (!pendingUserDoc.Exists)
                 {
                     return "Error: User not found in pending state.";
                 }
 
-                // Move user to the "Users" collection
                 var userDoc = pendingUserDoc.ToDictionary();
                 userDoc["verified"] = true;
 
