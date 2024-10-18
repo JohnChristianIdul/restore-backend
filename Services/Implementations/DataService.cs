@@ -244,8 +244,8 @@ namespace ReStore___backend.Services.Implementations
         }
         private async Task<bool> IsEmailVerified(string userId)
         {
-            var user = await _authProvider.GetUserAsync(userId);
-            return user?.IsEmailVerified ?? false;
+            var user = await FirebaseAuth.DefaultInstance.GetUserAsync(userId);
+            return user.EmailVerified;
         }
         public async Task<LoginResultDTO> Login(string email, string password)
         {
