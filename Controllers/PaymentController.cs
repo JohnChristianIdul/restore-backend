@@ -17,7 +17,6 @@ namespace Restore_backend_deployment_.Controllers
         private readonly IConfiguration _configuration;
         private readonly string _payMongoApiKey;
         private const int PricePerCredit = 50;
-        private readonly string _payMongoBaseUrl;
         private readonly IDataService _dataService;
         private readonly string _smtpEmail;
         private readonly string _smtpPassword;
@@ -26,7 +25,6 @@ namespace Restore_backend_deployment_.Controllers
         PaymentController(IConfiguration configuration, IDataService dataService)
         {
             _configuration = configuration;
-            _payMongoBaseUrl = "https://api.paymongo.com/v1/checkout_sessions";
             _payMongoApiKey = Environment.GetEnvironmentVariable("PAYMONGO_SECRET_KEY") ?? throw new ArgumentNullException("PayMongo API Key is not set in environment variables."); ;
             _smtpPassword = Environment.GetEnvironmentVariable("SMTP_EMAIL_PASSWORD");
             _smtpEmail = Environment.GetEnvironmentVariable("SMTP_EMAIL");
@@ -125,7 +123,7 @@ namespace Restore_backend_deployment_.Controllers
                 // Log the request body being sent to PayMongo
                 Console.WriteLine("Request Body: " + JsonConvert.SerializeObject(checkoutSessionBody));
 
-                var options = new RestClientOptions(_payMongoBaseUrl)
+                var options = new RestClientOptions("https://api.paymongo.com/v1/checkout_sessions")
                 {
                     ThrowOnAnyError = true,
                     Timeout = TimeSpan.FromMilliseconds(10000) // Increase timeout to 10 seconds
