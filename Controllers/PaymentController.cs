@@ -129,8 +129,7 @@ namespace Restore_backend_deployment_.Controllers
                     return BadRequest(new { message = "No payment information found" });
                 }
 
-                var paymentStatus = payments[0].attributes.status;
-                Console.WriteLine($"Payment status: {payments}");
+                var paymentStatus = payments[0]["attributes"]["status"].ToString();
                 var email = checkoutSessionDetails.data.attributes.billing.email;
 
                 if (paymentStatus == "paid")
