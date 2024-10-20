@@ -143,7 +143,7 @@ namespace Restore_backend_deployment_.Controllers
 
                     int quantity = lineItems[0]["quantity"]; 
 
-                    Console.WriteLine($"Quantity is of type {quantity.GetType()}.");
+                    Console.WriteLine($"Quantity value is {quantity}.");
                     await _dataService.SaveCustomerCreditsAsync(email.ToString(), quantity);
                     
 
