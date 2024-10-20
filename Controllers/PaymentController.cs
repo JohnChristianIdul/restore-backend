@@ -6,6 +6,7 @@ using RestSharp;
 using ReStore___backend.Services.Interfaces;
 using System.Net.Mail;
 using System.Net;
+using Org.BouncyCastle.Asn1.Cms;
 
 
 namespace Restore_backend_deployment_.Controllers
@@ -85,7 +86,7 @@ namespace Restore_backend_deployment_.Controllers
 
             var checkoutSessionResponse = await CreateCheckoutSessionInPayMongo(checkoutSessionBody);
 
-            if (checkoutSessionResponse != null)
+            if (checkoutSessionResponse.data.attributes.payments.status.ToString() == "paid")
             {
                 // Save customer credits
                 await _dataService.SaveCustomerCreditsAsync(email, creditsToPurchase);
@@ -102,7 +103,7 @@ namespace Restore_backend_deployment_.Controllers
 
                 await _dataService.SavePaymentReceiptAsync(paymentReceipt);
                 await SendEmailReceiptAsync(email, paymentReceipt);
-                if (checkoutSessionResponse.data.id != null)
+                if (checkoutSessionResponse.attributes.payments.status.ToString() == "paid")
                 {
                     await ExpireCheckoutSession(checkoutSessionResponse.data.id.ToString());
                 }
@@ -120,6 +121,28 @@ namespace Restore_backend_deployment_.Controllers
 
             return BadRequest(new { message = "Payment failed." });
         }
+
+        [HttpGet("{email}/credits")]
+        public async Task<IActionResult> GetCustomerCredits(string email)
+        {
+            if (string.IsNullOrEmpty(email))
+            {
+                return BadRequest("Email cannot be empty.");
+            }
+
+            try
+            {
+                int credits = await _dataService.GetCustomerCreditsAsync(email);
+                return Ok(new { Email = email, CreditsRemaining = credits });
+            }
+            catch (Exception ex)
+            {
+                // Log the error and return a server error response
+                Console.WriteLine($"Error retrieving customer credits: {ex.Message}");
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
         public async Task<dynamic> CreateCheckoutSessionInPayMongo(object checkoutSessionBody)
         {
             try
@@ -187,7 +210,6 @@ namespace Restore_backend_deployment_.Controllers
             }
         }
 
-        // Method to expire the checkout session
         public async Task ExpireCheckoutSession(string sessionId)
         {
             var options = new RestClientOptions($"https://api.paymongo.com/v1/checkout_sessions/{sessionId}/expire")
