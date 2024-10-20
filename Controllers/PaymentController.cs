@@ -114,7 +114,7 @@ namespace Restore_backend_deployment_.Controllers
                 return Ok(new
                 {
                     message = "Payment session created successfully.",
-                    checkoutUrl = checkoutSessionResponse.data.attributes.checkout_url
+                    checkoutUrl = checkoutSessionResponse.data.attributes.checkout_url.ToString()
                 });
             }
 
