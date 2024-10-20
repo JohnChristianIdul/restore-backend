@@ -130,7 +130,7 @@ namespace Restore_backend_deployment_.Controllers
                 }
 
                 var paymentStatus = payments[0]["attributes"]["status"].ToString();
-                var email = checkoutSessionDetails.data.attributes.billing.email;
+                var email = checkoutSessionDetails.data.attributes.billing.email.ToString();
 
                 if (paymentStatus == "paid")
                 {
@@ -150,9 +150,9 @@ namespace Restore_backend_deployment_.Controllers
                     var paymentReceipt = new PaymentReceipt
                     {
                         Email = email,
-                        CheckoutSessionId = sessionId,
+                        PaymentId = checkoutSessionDetails.payment_intent.id.ToString(),
                         PaymentDate = DateTime.UtcNow,
-                        Amount = checkoutSessionDetails.data.attributes.amount,
+                        Amount = int.Parse(checkoutSessionDetails.data.attributes.amount),
                         Description = "Buying credits for Restore",
                         Quantity = quantity
                     };
