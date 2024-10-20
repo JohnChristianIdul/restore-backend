@@ -47,8 +47,8 @@ namespace Restore_backend_deployment_.Controllers
                 return BadRequest(new { message = "Invalid input data." });
             }
 
-            int pricePerCredit = 100;
-            int totalAmount = creditsToPurchase * pricePerCredit * 100;
+            int pricePerCredit = 25;
+            int totalAmount = creditsToPurchase * pricePerCredit * 10;
 
             var checkoutSessionBody = new
             {
@@ -93,46 +93,56 @@ namespace Restore_backend_deployment_.Controllers
 
             // Return the checkout URL to the client for the payment to be made
             string checkoutUrl = checkoutSessionResponse.data.attributes.checkout_url.ToString();
+            string checkoutSessionId = checkoutSessionResponse.data.id.ToString();
 
             return Ok(new
             {
                 message = "Checkout session created successfully.",
-                checkout_url = checkoutUrl
+                checkout_url = checkoutUrl,
+                id = checkoutSessionId
             });
         }
 
+        // api/payment/paymongo-webhook
         [HttpPost("paymongo-webhook")]
-        public async Task<IActionResult> HandlePaymentWebhook([FromBody] PayMongoWebhookModel payload)
+        public async Task<IActionResult> HandlePaymentWebhook([FromBody] string sessionId)
         {
             // Log the received webhook for debugging purposes
-            Console.WriteLine("Received PayMongo Webhook: " + JsonConvert.SerializeObject(payload));
+            Console.WriteLine("Received PayMongo Webhook for session ID: " + sessionId);
 
             try
             {
-                // Extract relevant data from the payload
-                var checkoutSessionId = payload.data.id;
-                var paymentStatus = payload.data.attributes.status;
-                var email = payload.data.attributes.billing.email;
+                // Fetch the checkout session details from PayMongo
+                var checkoutSessionDetails = await GetCheckoutSessionDetails(sessionId);
+
+                if (checkoutSessionDetails == null)
+                {
+                    return BadRequest(new { message = "Failed to retrieve checkout session details." });
+                }
+
+                // Extract relevant data from the checkout session details
+                var paymentStatus = checkoutSessionDetails.data.attributes.status;
+                var email = checkoutSessionDetails.data.attributes.billing.email;
 
                 if (paymentStatus == "paid")
                 {
-                    // Save customer credits
-                    int quantity = payload.data.attributes.line_items.First().quantity;
+                    int quantity = checkoutSessionDetails.data.attributes.line_items.First().quantity;
+
                     await _dataService.SaveCustomerCreditsAsync(email, quantity);
 
-                    // Save payment receipt
                     var paymentReceipt = new PaymentReceipt
                     {
                         Email = email,
-                        CheckoutSessionId = checkoutSessionId,
+                        CheckoutSessionId = sessionId,
                         PaymentDate = DateTime.UtcNow,
-                        Amount = payload.data.attributes.amount,
-                        Description = "Buying credits for Restore"
+                        Amount = checkoutSessionDetails.data.attributes.amount,
+                        Description = "Buying credits for Restore",
+                        Quantity = quantity
                     };
 
                     await _dataService.SavePaymentReceiptAsync(paymentReceipt);
                     await SendEmailReceiptAsync(email, paymentReceipt);
-                    await ExpireCheckoutSession(checkoutSessionId);
+                    await ExpireCheckoutSession(sessionId);
 
                     return Ok(new { message = "Payment processed successfully." });
                 }
@@ -147,6 +157,50 @@ namespace Restore_backend_deployment_.Controllers
             }
         }
 
+        private async Task<dynamic> GetCheckoutSessionDetails(string checkoutSessionId)
+        {
+            try
+            {
+                var options = new RestClientOptions($"https://api.paymongo.com/v1/checkout_sessions/{checkoutSessionId}")
+                {
+                    ThrowOnAnyError = true,
+                    Timeout = TimeSpan.FromMilliseconds(20000)
+                };
+
+                var client = new RestClient(options);
+                var request = new RestRequest();
+
+                // Add headers
+                request.AddHeader("accept", "application/json");
+                request.AddHeader("authorization", $"Basic {Convert.ToBase64String(Encoding.UTF8.GetBytes(_payMongoApiKey))}");
+
+                // Execute the GET request
+                var response = await client.GetAsync(request);
+
+                // Log the full response content for debugging
+                Console.WriteLine("Response Status: " + response.StatusCode);
+                Console.WriteLine("Response Content: " + response.Content);
+
+                if (response.IsSuccessful)
+                {
+                    // Deserialize and return the response content
+                    return JsonConvert.DeserializeObject<dynamic>(response.Content);
+                }
+                else
+                {
+                    // Log the failure details
+                    Console.WriteLine($"Error: {response.StatusCode} - {response.Content}");
+                    return null;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("An error occurred: " + ex.Message);
+                throw;
+            }
+        }
+
+        // api/payment/customer-credits
         [HttpGet("customer-credits")]
         public async Task<IActionResult> GetCustomerCredits([FromQuery] string email)
         {
@@ -175,7 +229,7 @@ namespace Restore_backend_deployment_.Controllers
                 var options = new RestClientOptions("https://api.paymongo.com/v1/checkout_sessions")
                 {
                     ThrowOnAnyError = true,
-                    Timeout = TimeSpan.FromMilliseconds(10000) // Increase timeout to 10 seconds
+                    Timeout = TimeSpan.FromMilliseconds(10000)
                 };
 
                 var client = new RestClient(options);
