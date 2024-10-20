@@ -94,7 +94,7 @@ namespace Restore_backend_deployment_.Controllers
                 var paymentReceipt = new PaymentReceipt
                 {
                     Email = email,
-                    CheckoutSessionId = checkoutSessionResponse.id,
+                    CheckoutSessionId = checkoutSessionResponse.data.id,
                     PaymentDate = DateTime.UtcNow,
                     Amount = totalAmount,
                     Description = "Buying credits for Restore"
@@ -102,12 +102,12 @@ namespace Restore_backend_deployment_.Controllers
 
                 await _dataService.SavePaymentReceiptAsync(paymentReceipt);
                 await SendEmailReceiptAsync(email, paymentReceipt);
-                await ExpireCheckoutSession(checkoutSessionResponse.id);
+                await ExpireCheckoutSession(checkoutSessionResponse.data.id);
 
                 return Ok(new
                 {
                     message = "Payment session created successfully.",
-                    checkoutUrl = checkoutSessionResponse.attributes.checkout_url
+                    checkoutUrl = checkoutSessionResponse.data.attributes.checkout_url
                 });
             }
 
