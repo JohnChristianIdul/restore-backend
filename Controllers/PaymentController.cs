@@ -134,7 +134,14 @@ namespace Restore_backend_deployment_.Controllers
 
                 if (paymentStatus == "paid")
                 {
-                    int quantity = checkoutSessionDetails.data.attributes.line_items.First().quantity;
+                    var lineItems = checkoutSessionDetails.data.attributes.line_items;
+
+                    if (!lineItems.HasValues)
+                    {
+                        return BadRequest(new { message = "No line items found in the checkout session." });
+                    }
+
+                    int quantity = (int)lineItems[0]["quantity"]; 
 
                     await _dataService.SaveCustomerCreditsAsync(email, quantity);
 
@@ -159,7 +166,6 @@ namespace Restore_backend_deployment_.Controllers
             }
             catch (Exception ex)
             {
-                // Handle the error
                 Console.WriteLine("Error processing webhook: " + ex.Message);
                 return StatusCode(500, "Internal server error while processing payment.");
             }
@@ -191,7 +197,6 @@ namespace Restore_backend_deployment_.Controllers
 
                 if (response.IsSuccessful)
                 {
-                    // Deserialize and return the response content
                     return JsonConvert.DeserializeObject<dynamic>(response.Content);
                 }
                 else
