@@ -39,7 +39,6 @@ namespace Restore_backend_deployment_.Controllers
             [FromForm] string phone,
             [FromForm] int creditsToPurchase)
         {
-
             if (string.IsNullOrWhiteSpace(name) ||
                 string.IsNullOrWhiteSpace(email) ||
                 string.IsNullOrWhiteSpace(phone) ||
@@ -47,7 +46,6 @@ namespace Restore_backend_deployment_.Controllers
             {
                 return BadRequest(new { message = "Invalid input data." });
             }
-
 
             int pricePerCredit = 100;
             int totalAmount = creditsToPurchase * pricePerCredit * 100;
@@ -87,41 +85,54 @@ namespace Restore_backend_deployment_.Controllers
 
             var checkoutSessionResponse = await CreateCheckoutSessionInPayMongo(checkoutSessionBody);
 
-            if (checkoutSessionResponse.data.attributes.payments is JArray paymentsArray && paymentsArray.Count > 0)
+            if (checkoutSessionResponse == null)
             {
-                var paymentStatus = paymentsArray[0]["status"].ToString();
-                if (paymentStatus == "paid")
+                return BadRequest(new { message = "Failed to create checkout session." });
+            }
+
+            // Set up a timer to check the payment status for up to 5 minutes
+            int checkIntervalSeconds = 30;  // Check every 30 seconds
+            int timeoutMinutes = 5;  // Timeout after 5 minutes
+            int attempts = timeoutMinutes * 60 / checkIntervalSeconds;
+
+            for (int i = 0; i < attempts; i++)
+            {
+                if (checkoutSessionResponse.data.attributes.payments is JArray paymentsArray && paymentsArray.Count > 0)
                 {
-                    // Save customer credits
-                    await _dataService.SaveCustomerCreditsAsync(email, creditsToPurchase);
+                    var paymentStatus = paymentsArray[0]["status"]?.ToString();
 
-                    // Save payment receipt
-                    var paymentReceipt = new PaymentReceipt
+                    if (paymentStatus == "paid")
                     {
-                        Email = email,
-                        CheckoutSessionId = checkoutSessionResponse.data.id,
-                        PaymentDate = DateTime.UtcNow,
-                        Amount = totalAmount,
-                        Description = "Buying credits for Restore"
-                    };
+                        // Save customer credits
+                        await _dataService.SaveCustomerCreditsAsync(email, creditsToPurchase);
 
-                    await _dataService.SavePaymentReceiptAsync(paymentReceipt);
-                    await SendEmailReceiptAsync(email, paymentReceipt);
-                    await ExpireCheckoutSession(checkoutSessionResponse.data.id.ToString());
+                        // Save payment receipt
+                        var paymentReceipt = new PaymentReceipt
+                        {
+                            Email = email,
+                            CheckoutSessionId = checkoutSessionResponse.data.id,
+                            PaymentDate = DateTime.UtcNow,
+                            Amount = totalAmount,
+                            Description = "Buying credits for Restore"
+                        };
 
-                    return Ok(new
-                    {
-                        message = "Payment session created successfully.",
-                        checkoutUrl = checkoutSessionResponse.data.attributes.checkout_url.ToString()
-                    });
+                        await _dataService.SavePaymentReceiptAsync(paymentReceipt);
+                        await SendEmailReceiptAsync(email, paymentReceipt);
+                        await ExpireCheckoutSession(checkoutSessionResponse.data.id.ToString());
+
+                        return Ok(new
+                        {
+                            message = "Payment successful.",
+                        });
+                    }
                 }
-            }
-            else
-            {
-                Console.WriteLine("Payment status is not available or no payments were found.");
+
+                // Wait for the next interval
+                await Task.Delay(checkIntervalSeconds * 1000);
             }
 
-            return BadRequest(new { message = "Payment failed." });
+            // If the payment was not successful after 5 minutes
+            return BadRequest(new { message = "Payment failed or was not completed in time." });
         }
 
         [HttpGet("customer-credits")]
