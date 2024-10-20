@@ -123,11 +123,14 @@ namespace Restore_backend_deployment_.Controllers
 
                 // Extract relevant data from the checkout session details
                 var payments = checkoutSessionDetails.data.attributes.payments;
-                if(payments == null)
+
+                if (payments.Count == 0)
                 {
                     return BadRequest(new { message = "No payment information found" });
                 }
+
                 var paymentStatus = payments[0].attributes.status;
+                Console.WriteLine($"Payment status: {payments}");
                 var email = checkoutSessionDetails.data.attributes.billing.email;
 
                 if (paymentStatus == "paid")
