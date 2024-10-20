@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using ReStore___backend.Dtos;
+using Restore_backend_deployment_.Models;
 using System.Runtime.CompilerServices;
 
 namespace ReStore___backend.Services.Interfaces
@@ -22,5 +23,6 @@ namespace ReStore___backend.Services.Interfaces
         Task<(bool success, string message)> VerifyEmail(string oobcode);
         Task<LoginResultDTO> Login(string email, string password);
         Task SendPasswordResetEmailAsync(string email);
+        Task<PayMongoCheckoutSessionResponse> CreatePaymentIntent(int amount);
     }
 }

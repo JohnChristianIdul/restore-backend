@@ -16,11 +16,13 @@ using FirebaseAdmin.Auth;
 using System.Net.Mail;
 using System.Net;
 using FirebaseAdmin;
-using System.Security.Cryptography;
-using Newtonsoft.Json.Linq;
-using Restore_backend_deployment_.DTO_s;
-using System.Reflection.Emit;
 using ReStore___backend.Controllers;
+using Restore_backend_deployment_.Models;
+using RestSharp;
+using System.IO;
+using System.Security.AccessControl;
+using Firebase.Auth.Objects;
+using static Google.Cloud.Firestore.V1.StructuredAggregationQuery.Types.Aggregation.Types;
 
 namespace ReStore___backend.Services.Implementations
 {
@@ -980,6 +982,72 @@ namespace ReStore___backend.Services.Implementations
             {
                 return $"Error in formatting demand prediction data: {ex.Message}";
             }
+        }
+
+        // Helper method to create a checkout session
+        private async Task<PayMongoCheckoutSessionResponse> CreatePaymentIntent(int amount)
+        {
+            var options = new RestClientOptions("https://api.paymongo.com/v1/checkout_sessions");
+            var client = new RestClient(options);
+            var request = new RestRequest("payment_links", Method.POST);
+            request.AddHeader("accept", "application/json");
+            request.AddHeader("Authorization", $"Basic {Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(Environment.GetEnvironmentVariable("PAYMONGO_SECRET_KEY")))}");
+            request.AddJsonBody(
+                    "{\"data\":{\"attributes\":{\"send_email_receipt\":true,\"show_description\":true,\"show_line_items\":true,\"line_items\":[{\"currency\":\"PHP\"}]}}}", 
+                    false
+                );
+
+            var response = await client.PostAsync(request);
+            var body = new
+            {
+                data = new
+                {
+                    attributes = new
+                    {
+                        amount = amount,
+                        payment_method_allowed = new[] { "card" },
+                        currency = "PHP"
+                    }
+                }
+            };
+
+            request.AddJsonBody(body);
+
+            var response = await client.ExecuteAsync(request);
+
+            if (!response.IsSuccessful)
+            {
+                throw new Exception("Error creating payment intent: " + response.Content);
+            }
+
+            return JsonConvert.DeserializeObject<PayMongoCheckoutSessionResponse>(response.Content);
+        }
+        private async Task UpdatePaymentStatus(string paymentIntentId, string status)
+        {
+            var paymentData = new
+            {
+                paymentIntentId = paymentIntentId,
+                userId = userId,
+                numberOfCredits = numberOfCredits,
+                amount = amount, // in cents (or appropriate currency unit)
+                currency = currency,
+                paymentMethod = paymentMethod,
+                status = status,
+                createdAt = DateTime.UtcNow,
+                updatedAt = DateTime.UtcNow,
+                receiptUrl = receiptUrl,  // Optional field for receipt URL
+                externalReferenceId = externalReferenceId // Optional external reference
+            };
+            await _storageClient.UploadObjectAsync(_bucketName, objectName, null, memoryStream);
+        }
+        private async Task UpdateCredits(string email)
+        {
+
+        }
+        private async Task DisablePaymentLink(string paymentIntentId)
+        {
+            // Disable the payment link or mark it as used in your database
+            // Example: UPDATE payment_links SET is_disabled = 1 WHERE payment_intent_id = @paymentIntentId
         }
     }
 }
