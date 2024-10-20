@@ -14,7 +14,6 @@ namespace Restore_backend_deployment_.Controllers
     [Route("api/[controller]")]
     public class PaymentController : ControllerBase
     {
-        private readonly IConfiguration _configuration;
         private readonly string _payMongoApiKey;
         private const int PricePerCredit = 50;
         private readonly IDataService _dataService;
@@ -22,9 +21,8 @@ namespace Restore_backend_deployment_.Controllers
         private readonly string _smtpPassword;
 
 
-        PaymentController(IConfiguration configuration, IDataService dataService)
+        PaymentController(IDataService dataService)
         {
-            _configuration = configuration;
             _payMongoApiKey = Environment.GetEnvironmentVariable("PAYMONGO_SECRET_KEY") ?? throw new ArgumentNullException("PayMongo API Key is not set in environment variables."); ;
             _smtpPassword = Environment.GetEnvironmentVariable("SMTP_EMAIL_PASSWORD");
             _smtpEmail = Environment.GetEnvironmentVariable("SMTP_EMAIL");
