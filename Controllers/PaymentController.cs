@@ -114,7 +114,6 @@ namespace Restore_backend_deployment_.Controllers
             {
                 // Fetch the checkout session details from PayMongo
                 var checkoutSessionDetails = await GetCheckoutSessionDetails(sessionId);
-                Console.WriteLine(checkoutSessionDetails.data.attributes.billing.status);
 
                 if (checkoutSessionDetails == null)
                 {
@@ -122,7 +121,7 @@ namespace Restore_backend_deployment_.Controllers
                 }
 
                 // Extract relevant data from the checkout session details
-                var paymentStatus = checkoutSessionDetails.data.attributes.status;
+                var paymentStatus = checkoutSessionDetails.data.attributes.payments[0].attributes.status;
                 var email = checkoutSessionDetails.data.attributes.billing.email;
 
                 if (paymentStatus == "paid")
