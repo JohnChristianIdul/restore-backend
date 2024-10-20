@@ -35,14 +35,25 @@ namespace Restore_backend_deployment_.Controllers
 
         // POST api/payment/buy-credits
         [HttpPost("buy-credits")]
-        public async Task<IActionResult> CreateCheckoutSession([FromBody] CheckoutSessionRequest request)
+        public async Task<IActionResult> CreateCheckoutSession(
+            [FromForm] string name,
+            [FromForm] string email,
+            [FromForm] string phone,
+            [FromForm] int creditsToPurchase)
         {
-            string email = request.Data.Attributes.Billing.Email;
-            int creditsToPurchase = request.Credits;
 
-            int totalAmount = creditsToPurchase * PricePerCredit * 100;
+            if (string.IsNullOrWhiteSpace(name) ||
+                string.IsNullOrWhiteSpace(email) ||
+                string.IsNullOrWhiteSpace(phone) ||
+                creditsToPurchase <= 0)
+            {
+                return BadRequest(new { message = "Invalid input data." });
+            }
 
-            // Create the checkout session request body
+
+            int pricePerCredit = 100;
+            int totalAmount = creditsToPurchase * pricePerCredit * 100;
+
             var checkoutSessionBody = new
             {
                 data = new
@@ -51,9 +62,9 @@ namespace Restore_backend_deployment_.Controllers
                     {
                         billing = new
                         {
-                            name = request.Data.Attributes.Billing.Name,
+                            name = name,
                             email = email,
-                            phone = request.Data.Attributes.Billing.Phone
+                            phone = phone
                         },
                         send_email_receipt = true,
                         show_description = true,
@@ -76,7 +87,6 @@ namespace Restore_backend_deployment_.Controllers
                 }
             };
 
-            // Call the method to create the checkout session in PayMongo
             var checkoutSessionResponse = await CreateCheckoutSessionInPayMongo(checkoutSessionBody);
 
             if (checkoutSessionResponse != null)
@@ -96,15 +106,17 @@ namespace Restore_backend_deployment_.Controllers
 
                 await _dataService.SavePaymentReceiptAsync(paymentReceipt);
                 await SendEmailReceiptAsync(email, paymentReceipt);
-
                 await ExpireCheckoutSession(checkoutSessionResponse.id);
 
-                return Ok(new { message = "Payment successful and data saved.", sessionId = checkoutSessionResponse.id });
+                return Ok(new
+                {
+                    message = "Payment session created successfully.",
+                    checkoutUrl = checkoutSessionResponse.attributes.checkout_url
+                });
             }
 
             return BadRequest(new { message = "Payment failed." });
         }
-
         public async Task<dynamic> CreateCheckoutSessionInPayMongo(object checkoutSessionBody)
         {
             try
@@ -210,7 +222,7 @@ namespace Restore_backend_deployment_.Controllers
                     From = new MailAddress(_smtpEmail),
                     Subject = subject,
                     Body = body,
-                    IsBodyHtml = true, // Set to true if you're using HTML for body
+                    IsBodyHtml = true,
                 };
 
                 mailMessage.To.Add(email);
