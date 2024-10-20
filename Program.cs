@@ -1,6 +1,7 @@
 using Microsoft.OpenApi.Models;
 using ReStore___backend.Services.Implementations;
 using ReStore___backend.Services.Interfaces;
+
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 var AllowMyOrigins = "_allowMyorigins";
@@ -18,8 +19,14 @@ builder.Services.AddCors(options =>
                     });
 });
 
+// Add controllers
 builder.Services.AddControllers();
+
+// Register your services (make sure DataService implements IDataService)
 builder.Services.AddScoped<IDataService, DataService>();
+
+// Add HttpClient
+builder.Services.AddHttpClient();
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -34,20 +41,22 @@ builder.Services.AddSwaggerGen(c =>
     c.OperationFilter<FileUploadOperationFilter>();
 });
 
-// Register HttpClient
-builder.Services.AddHttpClient();
+// Register any other necessary services
+builder.Services.AddSingleton(new PayMongoSettings
+{
+    BaseUrl = Environment.GetEnvironmentVariable("PAYMONGO_BASE_URL"),
+    ApiKey = Environment.GetEnvironmentVariable("PAYMONGO_API_KEY")
+})
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-//app.UseHttpsRedirection(); //comment out for CORS preflight error
 
-app.UseRouting(); // added UseRouting
+app.UseRouting();
 
 app.UseCors(AllowMyOrigins);
 
@@ -94,4 +103,10 @@ public class FileUploadOperationFilter : IOperationFilter
             };
         }
     }
+}
+
+public class PayMongoSettings
+{
+    public string BaseUrl { get; set; }
+    public string ApiKey { get; set; }
 }

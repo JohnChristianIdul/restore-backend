@@ -17,7 +17,7 @@ namespace Restore_backend_deployment_.Controllers
         private readonly IConfiguration _configuration;
         private readonly string _payMongoApiKey;
         private const int PricePerCredit = 50;
-        private readonly string _payMongoBaseUrl = "https://api.paymongo.com/v1/checkout_sessions";
+        private readonly string _payMongoBaseUrl;
         private readonly IDataService _dataService;
         private readonly string _smtpEmail;
         private readonly string _smtpPassword;
@@ -25,7 +25,8 @@ namespace Restore_backend_deployment_.Controllers
 
         PaymentController(IConfiguration configuration, IDataService dataService)
         {
-            _configuration = configuration;            
+            _configuration = configuration;
+            _payMongoBaseUrl = "https://api.paymongo.com/v1/checkout_sessions";
             _payMongoApiKey = Environment.GetEnvironmentVariable("PAYMONGO_SECRET_KEY");
             _smtpPassword = Environment.GetEnvironmentVariable("SMTP_EMAIL_PASSWORD");
             _smtpEmail = Environment.GetEnvironmentVariable("SMTP_EMAIL");
