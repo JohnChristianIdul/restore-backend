@@ -30,6 +30,7 @@ namespace Restore_backend_deployment_.Controllers
             _smtpPassword = Environment.GetEnvironmentVariable("SMTP_EMAIL_PASSWORD");
             _smtpEmail = Environment.GetEnvironmentVariable("SMTP_EMAIL");
             _dataService = dataService;
+            Console.WriteLine($"PayMongoApiKey : {_payMongoApiKey}");
         }
 
         // POST api/payment/buy-credits
@@ -39,7 +40,6 @@ namespace Restore_backend_deployment_.Controllers
             string email = request.Data.Attributes.Billing.Email;
             int creditsToPurchase = request.Credits;
 
-            // Calculate the total amount in centavos (smallest currency unit)
             int totalAmount = creditsToPurchase * PricePerCredit * 100;
 
             // Create the checkout session request body
