@@ -20,8 +20,7 @@ namespace Restore_backend_deployment_.Controllers
         private readonly string _smtpEmail;
         private readonly string _smtpPassword;
 
-
-        PaymentController(IDataService dataService)
+        public PaymentController(IDataService dataService)
         {
             _payMongoApiKey = Environment.GetEnvironmentVariable("PAYMONGO_SECRET_KEY") ?? throw new ArgumentNullException("PayMongo API Key is not set in environment variables."); ;
             _smtpPassword = Environment.GetEnvironmentVariable("SMTP_EMAIL_PASSWORD");
