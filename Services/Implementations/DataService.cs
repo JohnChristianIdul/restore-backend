@@ -19,6 +19,7 @@ using FirebaseAdmin;
 using ReStore___backend.Controllers;
 using Firebase.Auth.Objects;
 using Restore_backend_deployment_.Models;
+using FirebaseAuth = FirebaseAdmin.Auth.FirebaseAuth;
 
 
 namespace ReStore___backend.Services.Implementations
