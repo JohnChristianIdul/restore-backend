@@ -339,7 +339,7 @@ namespace Restore_backend_deployment_.Controllers
             sb.Append("<div style='border: 1px solid #000; padding: 10px; width: 300px;'>");
             sb.Append("<h2 style='text-align: center;'>Payment Receipt</h2>");
             sb.Append("<p><strong>Email:</strong> " + receipt.Email + "</p>");
-            sb.Append("<p><strong>Checkout Session ID:</strong> " + receipt.CheckoutSessionId + "</p>");
+            sb.Append("<p><strong>Payment ID:</strong> " + receipt.PaymentId + "</p>");
             sb.Append("<p><strong>Payment Date:</strong> " + receipt.PaymentDate.ToString("g") + "</p>");
             sb.Append("<p><strong>Amount:</strong> " + (receipt.Amount / 100m).ToString("C") + "</p>");
             sb.Append("<p><strong>Description:</strong> " + receipt.Description + "</p>");
