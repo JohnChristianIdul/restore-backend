@@ -141,7 +141,7 @@ namespace Restore_backend_deployment_.Controllers
                         return BadRequest(new { message = "No line items found in the checkout session." });
                     }
 
-                    int quantity = (int)lineItems[0]["quantity"]; 
+                    int quantity = int.Parse(lineItems[0]["quantity"]); 
 
                     await _dataService.SaveCustomerCreditsAsync(email, quantity);
 
