@@ -65,6 +65,7 @@ namespace Restore_backend_deployment_.Controllers
                         send_email_receipt = true,
                         show_description = true,
                         show_line_items = true,
+                        billing_information_fields_editable = "disabled",
                         description = "Credits for Restore forecasting service.",
                         payment_method_types = new[] { "gcash" },
                         statement_descriptor = "Restore Credits",
@@ -122,7 +123,7 @@ namespace Restore_backend_deployment_.Controllers
 
                 // Extract relevant data from the checkout session details
                 var payments = checkoutSessionDetails.data.attributes.payments;
-                if(payments == null || !payments.Any())
+                if(payments == null)
                 {
                     return BadRequest(new { message = "No payment information found" });
                 }
