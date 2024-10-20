@@ -1020,8 +1020,23 @@ namespace ReStore___backend.Services.Implementations
                 CreditsRemaining = credits
             };
 
-            CollectionReference creditsCollection = _firestoreDb.Collection("customerCredits");
-            await creditsCollection.Document(email).SetAsync(customerCredits);
+            try
+            {
+                CollectionReference creditsCollection = _firestoreDb.Collection("customerCredits");
+                // Save the customer credits to Firestore
+                await creditsCollection.Document(email).SetAsync(customerCredits);
+                Console.WriteLine("Customer credits saved successfully.");
+            }
+            catch (Exception ex)
+            {
+                // Log the error details
+                Console.WriteLine($"Error saving customer credits: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
+                }
+                throw; // Rethrow or handle as necessary
+            }
         }
 
         public async Task SavePaymentReceiptAsync(PaymentReceipt receipt)

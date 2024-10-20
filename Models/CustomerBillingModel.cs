@@ -1,18 +1,30 @@
-﻿namespace Restore_backend_deployment_.Models
+﻿using Google.Cloud.Firestore;
+
+namespace Restore_backend_deployment_.Models
 {
+    [FirestoreData]
     public class CustomerCredits
     {
-        public string Email { get; set; }
+        public CustomerCredits() { }
+        [FirestoreProperty]
+        public string? Email { get; set; }
+        [FirestoreProperty]
         public int CreditsRemaining { get; set; }
     }
 
+    [FirestoreData]
     public class PaymentReceipt
     {
-        public string Email { get; set; }
-        public string CheckoutSessionId { get; set; }
+        [FirestoreProperty]
+        public string? Email { get; set; }
+        [FirestoreProperty]
+        public string? CheckoutSessionId { get; set; }
+        [FirestoreProperty]
         public DateTime PaymentDate { get; set; }
-        public int Amount { get; set; } // Store amount in the smallest currency unit (e.g., cents)
-        public string Description { get; set; }
+        [FirestoreProperty]
+        public int Amount { get; set; }
+        [FirestoreProperty]
+        public string? Description { get; set; }
     }
 
 }
