@@ -83,6 +83,7 @@ namespace Restore_backend_deployment_.Controllers
                 }
             };
 
+            // Create the checkout session in PayMongo and return the checkout URL.
             var checkoutSessionResponse = await CreateCheckoutSessionInPayMongo(checkoutSessionBody);
 
             if (checkoutSessionResponse == null)
@@ -90,49 +91,59 @@ namespace Restore_backend_deployment_.Controllers
                 return BadRequest(new { message = "Failed to create checkout session." });
             }
 
-            // Set up a timer to check the payment status for up to 5 minutes
-            int checkIntervalSeconds = 30;  // Check every 30 seconds
-            int timeoutMinutes = 5;  // Timeout after 5 minutes
-            int attempts = timeoutMinutes * 60 / checkIntervalSeconds;
+            // Return the checkout URL to the client for the payment to be made
+            string checkoutUrl = checkoutSessionResponse.data.attributes.checkout_url.ToString();
 
-            for (int i = 0; i < attempts; i++)
+            return Ok(new
             {
-                if (checkoutSessionResponse.data.attributes.payments is JArray paymentsArray && paymentsArray.Count > 0)
+                message = "Checkout session created successfully.",
+                checkout_url = checkoutUrl
+            });
+        }
+
+        [HttpPost("paymongo-webhook")]
+        public async Task<IActionResult> HandlePaymentWebhook([FromBody] dynamic payload)
+        {
+            // Log the received webhook for debugging purposes
+            Console.WriteLine("Received PayMongo Webhook: " + JsonConvert.SerializeObject(payload));
+
+            try
+            {
+                // Extract relevant data from the payload (e.g., checkout session ID and payment status)
+                var checkoutSessionId = payload.data.attributes.checkout_session_id.ToString();
+                var paymentStatus = payload.data.attributes.status.ToString();
+                var email = payload.data.attributes.billing.email.ToString();
+
+                if (paymentStatus == "paid")
                 {
-                    var paymentStatus = paymentsArray[0]["status"]?.ToString();
+                    // Save customer credits
+                    await _dataService.SaveCustomerCreditsAsync(email, Convert.ToInt32(payload.data.attributes.line_items.quantity.ToString()));
 
-                    if (paymentStatus == "paid")
+                    // Save payment receipt
+                    var paymentReceipt = new PaymentReceipt
                     {
-                        // Save customer credits
-                        await _dataService.SaveCustomerCreditsAsync(email, creditsToPurchase);
+                        Email = email,
+                        CheckoutSessionId = checkoutSessionId,
+                        PaymentDate = DateTime.UtcNow,
+                        Amount = payload.data.attributes.amount, // Use the amount from webhook payload
+                        Description = "Buying credits for Restore"
+                    };
 
-                        // Save payment receipt
-                        var paymentReceipt = new PaymentReceipt
-                        {
-                            Email = email,
-                            CheckoutSessionId = checkoutSessionResponse.data.id,
-                            PaymentDate = DateTime.UtcNow,
-                            Amount = totalAmount,
-                            Description = "Buying credits for Restore"
-                        };
+                    await _dataService.SavePaymentReceiptAsync(paymentReceipt);
+                    await SendEmailReceiptAsync(email, paymentReceipt);
+                    await ExpireCheckoutSession(checkoutSessionId); // Optionally expire session
 
-                        await _dataService.SavePaymentReceiptAsync(paymentReceipt);
-                        await SendEmailReceiptAsync(email, paymentReceipt);
-                        await ExpireCheckoutSession(checkoutSessionResponse.data.id.ToString());
-
-                        return Ok(new
-                        {
-                            message = "Payment successful.",
-                        });
-                    }
+                    return Ok(new { message = "Payment processed successfully." });
                 }
 
-                // Wait for the next interval
-                await Task.Delay(checkIntervalSeconds * 1000);
+                return BadRequest(new { message = "Payment not successful or status unknown." });
             }
-
-            // If the payment was not successful after 5 minutes
-            return BadRequest(new { message = "Payment failed or was not completed in time." });
+            catch (Exception ex)
+            {
+                // Handle the error
+                Console.WriteLine("Error processing webhook: " + ex.Message);
+                return StatusCode(500, "Internal server error while processing payment.");
+            }
         }
 
         [HttpGet("customer-credits")]
@@ -160,9 +171,6 @@ namespace Restore_backend_deployment_.Controllers
         {
             try
             {
-                // Log the request body being sent to PayMongo
-                Console.WriteLine("Request Body: " + JsonConvert.SerializeObject(checkoutSessionBody));
-
                 var options = new RestClientOptions("https://api.paymongo.com/v1/checkout_sessions")
                 {
                     ThrowOnAnyError = true,
@@ -186,39 +194,26 @@ namespace Restore_backend_deployment_.Controllers
                 Console.WriteLine("Response Status: " + response.StatusCode);
                 Console.WriteLine("Response Content: " + response.Content);
 
-                // Check if the response is successful
                 if (response.IsSuccessful)
                 {
-                    // Log success message
-                    Console.WriteLine("Checkout session created successfully!");
-
                     // Deserialize and return the response content
                     return JsonConvert.DeserializeObject<dynamic>(response.Content);
                 }
                 else
                 {
-                    // Log the failure details with status and content
-                    Console.WriteLine("Failed to create checkout session.");
-                    Console.WriteLine($"Status Code: {response.StatusCode}");
-                    Console.WriteLine("Response Error Content: " + response.Content);
-
-                    // Throw an exception with the response content for further handling
+                    // Log the failure details
+                    Console.WriteLine($"Error: {response.StatusCode} - {response.Content}");
                     throw new Exception($"Error: {response.StatusCode} - {response.Content}");
                 }
             }
             catch (Exception ex)
             {
-                // Log the full exception details
                 Console.WriteLine("An error occurred: " + ex.Message);
                 if (ex.InnerException != null)
                 {
                     Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
                 }
 
-                // Optionally, you could log the stack trace for deeper debugging:
-                Console.WriteLine("Stack Trace: " + ex.StackTrace);
-
-                // Rethrow or handle the exception based on your application needs
                 throw;
             }
         }
