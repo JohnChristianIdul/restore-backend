@@ -145,7 +145,9 @@ namespace Restore_backend_deployment_.Controllers
 
                     Console.WriteLine($"Quantity value is {quantity}.");
                     await _dataService.SaveCustomerCreditsAsync(email.ToString(), quantity);
-                    
+
+                    Console.WriteLine($"Email: {email}, PaymentID = {checkoutSessionDetails.payment_intent.id.ToString()}, PaymentDate = {int.Parse(checkoutSessionDetails.data.attributes.amount)}, Quantity = {quantity}");
+                    Console.WriteLine($"SessionID = {sessionId}");
 
                     var paymentReceipt = new PaymentReceipt
                     {
