@@ -7,6 +7,7 @@ using ReStore___backend.Services.Interfaces;
 using System.Net.Mail;
 using System.Net;
 using Org.BouncyCastle.Asn1.Cms;
+using Newtonsoft.Json.Linq;
 
 
 namespace Restore_backend_deployment_.Controllers
@@ -86,37 +87,38 @@ namespace Restore_backend_deployment_.Controllers
 
             var checkoutSessionResponse = await CreateCheckoutSessionInPayMongo(checkoutSessionBody);
 
-            if (checkoutSessionResponse.data.attributes.payments.status.ToString() == "paid")
+            if (checkoutSessionResponse.data.attributes.payments is JArray paymentsArray && paymentsArray.Count > 0)
             {
-                // Save customer credits
-                await _dataService.SaveCustomerCreditsAsync(email, creditsToPurchase);
-
-                // Save payment receipt
-                var paymentReceipt = new PaymentReceipt
+                var paymentStatus = paymentsArray[0]["status"].ToString();
+                if (paymentStatus == "paid")
                 {
-                    Email = email,
-                    CheckoutSessionId = checkoutSessionResponse.data.id,
-                    PaymentDate = DateTime.UtcNow,
-                    Amount = totalAmount,
-                    Description = "Buying credits for Restore"
-                };
+                    // Save customer credits
+                    await _dataService.SaveCustomerCreditsAsync(email, creditsToPurchase);
 
-                await _dataService.SavePaymentReceiptAsync(paymentReceipt);
-                await SendEmailReceiptAsync(email, paymentReceipt);
-                if (checkoutSessionResponse.attributes.payments.status.ToString() == "paid")
-                {
+                    // Save payment receipt
+                    var paymentReceipt = new PaymentReceipt
+                    {
+                        Email = email,
+                        CheckoutSessionId = checkoutSessionResponse.data.id,
+                        PaymentDate = DateTime.UtcNow,
+                        Amount = totalAmount,
+                        Description = "Buying credits for Restore"
+                    };
+
+                    await _dataService.SavePaymentReceiptAsync(paymentReceipt);
+                    await SendEmailReceiptAsync(email, paymentReceipt);
                     await ExpireCheckoutSession(checkoutSessionResponse.data.id.ToString());
-                }
-                else
-                {
-                    Console.WriteLine("Checkout session ID is null.");
-                }
 
-                return Ok(new
-                {
-                    message = "Payment session created successfully.",
-                    checkoutUrl = checkoutSessionResponse.data.attributes.checkout_url.ToString()
-                });
+                    return Ok(new
+                    {
+                        message = "Payment session created successfully.",
+                        checkoutUrl = checkoutSessionResponse.data.attributes.checkout_url.ToString()
+                    });
+                }
+            }
+            else
+            {
+                Console.WriteLine("Payment status is not available or no payments were found.");
             }
 
             return BadRequest(new { message = "Payment failed." });
