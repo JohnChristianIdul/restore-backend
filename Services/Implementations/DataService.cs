@@ -1024,11 +1024,15 @@ namespace ReStore___backend.Services.Implementations
 
                 if (documentSnapshot.Exists)
                 {
-                    // If the document exists, update the CreditsRemaining field
                     var existingCredits = documentSnapshot.GetValue<int>("CreditsRemaining");
-                    var updatedCredits = existingCredits + credits;
+                    int updatedCredits = existingCredits + credits;
 
-                    await documentReference.UpdateAsync(new { CreditsRemaining = updatedCredits });
+                    var updates = new Dictionary<string, object>
+                    {
+                        { "CreditsRemaining", updatedCredits }
+                    };
+
+                    await documentReference.UpdateAsync(updates);
                     Console.WriteLine("Customer credits updated successfully.");
                 }
                 else
@@ -1046,13 +1050,12 @@ namespace ReStore___backend.Services.Implementations
             }
             catch (Exception ex)
             {
-                // Log the error details
                 Console.WriteLine($"Error saving customer credits: {ex.Message}");
                 if (ex.InnerException != null)
                 {
                     Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
                 }
-                throw; // Rethrow or handle as necessary
+                throw;
             }
         }
 
@@ -1076,18 +1079,17 @@ namespace ReStore___backend.Services.Implementations
                 else
                 {
                     Console.WriteLine($"No credits found for email: {email}");
-                    return 0; // or throw an exception based on your requirement
+                    return 0; 
                 }
             }
             catch (Exception ex)
-            {
-                // Log the error details
+            {                
                 Console.WriteLine($"Error retrieving customer credits: {ex.Message}");
                 if (ex.InnerException != null)
                 {
                     Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
                 }
-                throw; // Rethrow or handle as necessary
+                throw;
             }
         }
 
