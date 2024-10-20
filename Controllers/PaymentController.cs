@@ -35,10 +35,47 @@ namespace Restore_backend_deployment_.Controllers
             string email = request.Data.Attributes.Billing.Email;
             int creditsToPurchase = request.Credits;
 
-            bool paymentSuccess = true;
-            string checkoutSessionId = "your_checkout_session_id";
+            // Calculate the total amount in centavos (smallest currency unit)
+            int totalAmount = creditsToPurchase * PricePerCredit * 100;
 
-            if (paymentSuccess)
+            // Create the checkout session request body
+            var checkoutSessionBody = new
+            {
+                data = new
+                {
+                    attributes = new
+                    {
+                        billing = new
+                        {
+                            name = request.Data.Attributes.Billing.Name,
+                            email = email,
+                            phone = request.Data.Attributes.Billing.Phone
+                        },
+                        send_email_receipt = true,
+                        show_description = true,
+                        show_line_items = true,
+                        description = "Credits for Restore forecasting service.",
+                        payment_method_types = new[] { "gcash" },
+                        statement_descriptor = "Restore Credits",
+                        line_items = new[]
+                        {
+                    new
+                    {
+                        currency = "PHP",
+                        amount = totalAmount,
+                        description = "Credits for Restore forecasting service.",
+                        name = "Credits",
+                        quantity = creditsToPurchase
+                    }
+                }
+                    }
+                }
+            };
+
+            // Call the method to create the checkout session in PayMongo
+            var checkoutSessionResponse = await CreateCheckoutSessionInPayMongo(checkoutSessionBody);
+
+            if (checkoutSessionResponse != null)
             {
                 // Save customer credits
                 await _dataService.SaveCustomerCreditsAsync(email, creditsToPurchase);
@@ -47,24 +84,25 @@ namespace Restore_backend_deployment_.Controllers
                 var paymentReceipt = new PaymentReceipt
                 {
                     Email = email,
-                    CheckoutSessionId = checkoutSessionId,
+                    CheckoutSessionId = checkoutSessionResponse.Id, // Assuming checkoutSessionResponse has an Id property
                     PaymentDate = DateTime.UtcNow,
-                    Amount = creditsToPurchase * PricePerCredit * 100,
+                    Amount = totalAmount,
                     Description = "Buying credits for Restore"
                 };
+
                 await _dataService.SavePaymentReceiptAsync(paymentReceipt);
                 await SendEmailReceiptAsync(email, paymentReceipt);
 
                 // Expire the checkout session after successful payment
-                await ExpireCheckoutSession(checkoutSessionId);
+                await ExpireCheckoutSession(checkoutSessionResponse.Id); // Use actual checkout session ID
 
-                return Ok(new { message = "Payment successful and data saved." });
+                return Ok(new { message = "Payment successful and data saved.", sessionId = checkoutSessionResponse.Id });
             }
 
             return BadRequest(new { message = "Payment failed." });
         }
 
-        private async Task<CheckoutSessionRequest> CreateCheckoutSessionInPayMongo(CheckoutSessionRequest request)
+        public async Task<dynamic> CreateCheckoutSessionInPayMongo(object checkoutSessionBody)
         {
             var options = new RestClientOptions(_payMongoBaseUrl)
             {
@@ -76,21 +114,20 @@ namespace Restore_backend_deployment_.Controllers
             var restRequest = new RestRequest();
             restRequest.AddHeader("accept", "application/json");
             restRequest.AddHeader("authorization", $"Basic {Convert.ToBase64String(Encoding.UTF8.GetBytes(_payMongoApiKey))}");
-            restRequest.AddJsonBody(request); // Add the checkout session request body
+            restRequest.AddJsonBody(checkoutSessionBody); // Add the checkout session request body
 
             var response = await client.PostAsync(restRequest);
             if (response.IsSuccessful)
             {
-                return JsonConvert.DeserializeObject<CheckoutSessionRequest>(response.Content);
+                return JsonConvert.DeserializeObject<dynamic>(response.Content); // Deserialize to a dynamic object
             }
 
             // Log the error or handle it as needed
             throw new Exception("Failed to create checkout session: " + response.Content);
         }
 
-
         // Method to expire the checkout session
-        private async Task ExpireCheckoutSession(string sessionId)
+        public async Task ExpireCheckoutSession(string sessionId)
         {
             var options = new RestClientOptions($"https://api.paymongo.com/v1/checkout_sessions/{sessionId}/expire")
             {
@@ -110,7 +147,7 @@ namespace Restore_backend_deployment_.Controllers
                 throw new Exception("Failed to expire checkout session: " + response.Content);
             }
         }
-        private async Task SendEmailReceiptAsync(string email, PaymentReceipt receipt)
+        public async Task SendEmailReceiptAsync(string email, PaymentReceipt receipt)
         {
             var subject = "Your Payment Receipt";
             var body = BuildEmailBody(receipt);
@@ -135,7 +172,7 @@ namespace Restore_backend_deployment_.Controllers
                 await smtpClient.SendMailAsync(mailMessage);
             }
         }
-        private string BuildEmailBody(PaymentReceipt receipt)
+        public string BuildEmailBody(PaymentReceipt receipt)
         {
             var sb = new StringBuilder();
             sb.Append("<div style='border: 1px solid #000; padding: 10px; width: 300px;'>");
@@ -143,7 +180,7 @@ namespace Restore_backend_deployment_.Controllers
             sb.Append("<p><strong>Email:</strong> " + receipt.Email + "</p>");
             sb.Append("<p><strong>Checkout Session ID:</strong> " + receipt.CheckoutSessionId + "</p>");
             sb.Append("<p><strong>Payment Date:</strong> " + receipt.PaymentDate.ToString("g") + "</p>");
-            sb.Append("<p><strong>Amount:</strong> " + (receipt.Amount / 100m).ToString("C") + "</p>"); // Assuming amount is in cents
+            sb.Append("<p><strong>Amount:</strong> " + (receipt.Amount / 100m).ToString("C") + "</p>");
             sb.Append("<p><strong>Description:</strong> " + receipt.Description + "</p>");
             sb.Append("</div>");
 

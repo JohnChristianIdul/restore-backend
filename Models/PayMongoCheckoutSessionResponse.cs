@@ -2,21 +2,36 @@
 
 namespace Restore_backend_deployment_.Models
 {
-    public class PayMongoCheckoutSessionResponse
+    public class CheckoutSessionRequest
     {
-        [JsonProperty("data")]
-        public PayMongoCheckoutSessionData Data { get; set; }
+        public Data Data { get; set; }
+        public int Credits { get; set; }
     }
 
-    public class PayMongoCheckoutSessionData
+    public class Data
     {
-        [JsonProperty("attributes")]
-        public PayMongoCheckoutSessionAttributes Attributes { get; set; }
+        public Attributes Attributes { get; set; }
     }
 
-    public class PayMongoCheckoutSessionAttributes
+    public class Attributes
     {
-        [JsonProperty("checkout_url")]
-        public string CheckoutUrl { get; set; }
+        public Billing Billing { get; set; }
+        public bool SendEmailReceipt { get; set; }
+        public bool ShowDescription { get; set; }
+        public bool ShowLineItems { get; set; }
+        public string ReferenceNumber { get; set; }
+        public string StatementDescriptor { get; set; }
+        public string SuccessUrl { get; set; }
+        public List<string> PaymentMethodTypes { get; set; }
+        public string Description { get; set; }
+        public string CancelUrl { get; set; }
     }
+
+    public class Billing
+    {
+        public string Name { get; set; }
+        public string Email { get; set; }
+        public string Phone { get; set; }
+    }
+
 }

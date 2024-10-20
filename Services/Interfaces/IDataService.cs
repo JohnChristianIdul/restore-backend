@@ -23,6 +23,8 @@ namespace ReStore___backend.Services.Interfaces
         Task<(bool success, string message)> VerifyEmail(string oobcode);
         Task<LoginResultDTO> Login(string email, string password);
         Task SendPasswordResetEmailAsync(string email);
-        Task<PayMongoCheckoutSessionResponse> CreatePaymentIntent(int amount);
+        Task SaveCustomerCreditsAsync(string email, int credits);
+        Task DecreaseCreditsAsync(string email, int amount);
+        Task SavePaymentReceiptAsync(PaymentReceipt receipt);
     }
 }

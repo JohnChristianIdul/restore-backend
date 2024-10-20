@@ -17,12 +17,9 @@ using System.Net.Mail;
 using System.Net;
 using FirebaseAdmin;
 using ReStore___backend.Controllers;
-using Restore_backend_deployment_.Models;
-using RestSharp;
-using System.IO;
-using System.Security.AccessControl;
 using Firebase.Auth.Objects;
-using static Google.Cloud.Firestore.V1.StructuredAggregationQuery.Types.Aggregation.Types;
+using Restore_backend_deployment_.Models;
+
 
 namespace ReStore___backend.Services.Implementations
 {
@@ -355,6 +352,9 @@ namespace ReStore___backend.Services.Implementations
             // Create new folder in Cloud Storage
             var folderPath = $"upload_demands/{username}-upload-demands/";
 
+            // Decrease credits for each demand processed
+            await DecreaseCreditsAsync(username, 1); // Deduct 1 credit
+
             foreach (var group in groupedRecords)
             {
                 string productId = group.Key;
@@ -440,6 +440,9 @@ namespace ReStore___backend.Services.Implementations
             // Create a filename
             string fileName = $"sales_{timestamp}.csv";
             string folderPath = $"upload_sales/{username}-upload-sales/";
+
+            // Decrease credits for each demand processed
+            await DecreaseCreditsAsync(username, 1); // Deduct 1 credit
 
             // Save the entire records to a MemoryStream
             using (var memoryStream = new MemoryStream())
@@ -983,71 +986,47 @@ namespace ReStore___backend.Services.Implementations
                 return $"Error in formatting demand prediction data: {ex.Message}";
             }
         }
-
-        // Helper method to create a checkout session
-        private async Task<PayMongoCheckoutSessionResponse> CreatePaymentIntent(int amount)
+        public async Task DecreaseCreditsAsync(string email, int amount)
         {
-            var options = new RestClientOptions("https://api.paymongo.com/v1/checkout_sessions");
-            var client = new RestClient(options);
-            var request = new RestRequest("payment_links", Method.POST);
-            request.AddHeader("accept", "application/json");
-            request.AddHeader("Authorization", $"Basic {Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(Environment.GetEnvironmentVariable("PAYMONGO_SECRET_KEY")))}");
-            request.AddJsonBody(
-                    "{\"data\":{\"attributes\":{\"send_email_receipt\":true,\"show_description\":true,\"show_line_items\":true,\"line_items\":[{\"currency\":\"PHP\"}]}}}", 
-                    false
-                );
+            DocumentReference docRef = _firestoreDb.Collection("customerCredits").Document(email);
+            var snapshot = await docRef.GetSnapshotAsync();
 
-            var response = await client.PostAsync(request);
-            var body = new
+            if (snapshot.Exists)
             {
-                data = new
+                var currentCredits = snapshot.GetValue<int>("CreditsRemaining");
+
+                // Check if the user has enough credits
+                if (currentCredits >= amount)
                 {
-                    attributes = new
-                    {
-                        amount = amount,
-                        payment_method_allowed = new[] { "card" },
-                        currency = "PHP"
-                    }
+                    // Update the credits
+                    await docRef.UpdateAsync("CreditsRemaining", currentCredits - amount);
                 }
-            };
-
-            request.AddJsonBody(body);
-
-            var response = await client.ExecuteAsync(request);
-
-            if (!response.IsSuccessful)
-            {
-                throw new Exception("Error creating payment intent: " + response.Content);
+                else
+                {
+                    throw new InvalidOperationException("Insufficient credits.");
+                }
             }
-
-            return JsonConvert.DeserializeObject<PayMongoCheckoutSessionResponse>(response.Content);
-        }
-        private async Task UpdatePaymentStatus(string paymentIntentId, string status)
-        {
-            var paymentData = new
+            else
             {
-                paymentIntentId = paymentIntentId,
-                userId = userId,
-                numberOfCredits = numberOfCredits,
-                amount = amount, // in cents (or appropriate currency unit)
-                currency = currency,
-                paymentMethod = paymentMethod,
-                status = status,
-                createdAt = DateTime.UtcNow,
-                updatedAt = DateTime.UtcNow,
-                receiptUrl = receiptUrl,  // Optional field for receipt URL
-                externalReferenceId = externalReferenceId // Optional external reference
+                throw new InvalidOperationException("User not found.");
+            }
+        }
+        public async Task SaveCustomerCreditsAsync(string email, int credits)
+        {
+            var customerCredits = new CustomerCredits
+            {
+                Email = email,
+                CreditsRemaining = credits
             };
-            await _storageClient.UploadObjectAsync(_bucketName, objectName, null, memoryStream);
-        }
-        private async Task UpdateCredits(string email)
-        {
 
+            CollectionReference creditsCollection = _firestoreDb.Collection("customerCredits");
+            await creditsCollection.Document(email).SetAsync(customerCredits);
         }
-        private async Task DisablePaymentLink(string paymentIntentId)
+
+        public async Task SavePaymentReceiptAsync(PaymentReceipt receipt)
         {
-            // Disable the payment link or mark it as used in your database
-            // Example: UPDATE payment_links SET is_disabled = 1 WHERE payment_intent_id = @paymentIntentId
+            CollectionReference receiptsCollection = _firestoreDb.Collection("paymentReceipts");
+            await receiptsCollection.AddAsync(receipt);
         }
     }
 }
