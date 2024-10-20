@@ -102,7 +102,14 @@ namespace Restore_backend_deployment_.Controllers
 
                 await _dataService.SavePaymentReceiptAsync(paymentReceipt);
                 await SendEmailReceiptAsync(email, paymentReceipt);
-                await ExpireCheckoutSession(checkoutSessionResponse.data.id);
+                if (checkoutSessionResponse.data.id != null)
+                {
+                    await ExpireCheckoutSession(checkoutSessionResponse.data.id.ToString());
+                }
+                else
+                {
+                    Console.WriteLine("Checkout session ID is null.");
+                }
 
                 return Ok(new
                 {
