@@ -19,12 +19,16 @@ namespace Restore_backend_deployment_.Controllers
         private const int PricePerCredit = 50;
         private readonly string _payMongoBaseUrl = "https://api.paymongo.com/v1/checkout_sessions";
         private readonly IDataService _dataService;
+        private readonly string _smtpEmail;
+        private readonly string _smtpPassword;
 
 
         PaymentController(IConfiguration configuration, IDataService dataService)
         {
             _configuration = configuration;            
             _payMongoApiKey = Environment.GetEnvironmentVariable("PAYMONGO_SECRET_KEY");
+            _smtpPassword = Environment.GetEnvironmentVariable("SMTP_EMAIL_PASSWORD");
+            _smtpEmail = Environment.GetEnvironmentVariable("SMTP_EMAIL");
             _dataService = dataService;
         }
 
@@ -84,7 +88,7 @@ namespace Restore_backend_deployment_.Controllers
                 var paymentReceipt = new PaymentReceipt
                 {
                     Email = email,
-                    CheckoutSessionId = checkoutSessionResponse.Id, // Assuming checkoutSessionResponse has an Id property
+                    CheckoutSessionId = checkoutSessionResponse.id,
                     PaymentDate = DateTime.UtcNow,
                     Amount = totalAmount,
                     Description = "Buying credits for Restore"
@@ -93,10 +97,9 @@ namespace Restore_backend_deployment_.Controllers
                 await _dataService.SavePaymentReceiptAsync(paymentReceipt);
                 await SendEmailReceiptAsync(email, paymentReceipt);
 
-                // Expire the checkout session after successful payment
-                await ExpireCheckoutSession(checkoutSessionResponse.Id); // Use actual checkout session ID
+                await ExpireCheckoutSession(checkoutSessionResponse.id);
 
-                return Ok(new { message = "Payment successful and data saved.", sessionId = checkoutSessionResponse.Id });
+                return Ok(new { message = "Payment successful and data saved.", sessionId = checkoutSessionResponse.id });
             }
 
             return BadRequest(new { message = "Payment failed." });
@@ -104,26 +107,69 @@ namespace Restore_backend_deployment_.Controllers
 
         public async Task<dynamic> CreateCheckoutSessionInPayMongo(object checkoutSessionBody)
         {
-            var options = new RestClientOptions(_payMongoBaseUrl)
+            try
             {
-                ThrowOnAnyError = true,
-                Timeout = TimeSpan.FromMilliseconds(3000)
-            };
+                // Log the request body being sent to PayMongo
+                Console.WriteLine("Request Body: " + JsonConvert.SerializeObject(checkoutSessionBody));
 
-            var client = new RestClient(options);
-            var restRequest = new RestRequest();
-            restRequest.AddHeader("accept", "application/json");
-            restRequest.AddHeader("authorization", $"Basic {Convert.ToBase64String(Encoding.UTF8.GetBytes(_payMongoApiKey))}");
-            restRequest.AddJsonBody(checkoutSessionBody); // Add the checkout session request body
+                var options = new RestClientOptions(_payMongoBaseUrl)
+                {
+                    ThrowOnAnyError = true,
+                    Timeout = TimeSpan.FromMilliseconds(10000) // Increase timeout to 10 seconds
+                };
 
-            var response = await client.PostAsync(restRequest);
-            if (response.IsSuccessful)
-            {
-                return JsonConvert.DeserializeObject<dynamic>(response.Content); // Deserialize to a dynamic object
+                var client = new RestClient(options);
+                var restRequest = new RestRequest();
+
+                // Add headers
+                restRequest.AddHeader("accept", "application/json");
+                restRequest.AddHeader("authorization", $"Basic {Convert.ToBase64String(Encoding.UTF8.GetBytes(_payMongoApiKey))}");
+
+                // Add JSON body
+                restRequest.AddJsonBody(checkoutSessionBody);
+
+                // Execute the POST request
+                var response = await client.PostAsync(restRequest);
+
+                // Log the full response content for debugging
+                Console.WriteLine("Response Status: " + response.StatusCode);
+                Console.WriteLine("Response Content: " + response.Content);
+
+                // Check if the response is successful
+                if (response.IsSuccessful)
+                {
+                    // Log success message
+                    Console.WriteLine("Checkout session created successfully!");
+
+                    // Deserialize and return the response content
+                    return JsonConvert.DeserializeObject<dynamic>(response.Content);
+                }
+                else
+                {
+                    // Log the failure details with status and content
+                    Console.WriteLine("Failed to create checkout session.");
+                    Console.WriteLine($"Status Code: {response.StatusCode}");
+                    Console.WriteLine("Response Error Content: " + response.Content);
+
+                    // Throw an exception with the response content for further handling
+                    throw new Exception($"Error: {response.StatusCode} - {response.Content}");
+                }
             }
+            catch (Exception ex)
+            {
+                // Log the full exception details
+                Console.WriteLine("An error occurred: " + ex.Message);
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine("Inner Exception: " + ex.InnerException.Message);
+                }
 
-            // Log the error or handle it as needed
-            throw new Exception("Failed to create checkout session: " + response.Content);
+                // Optionally, you could log the stack trace for deeper debugging:
+                Console.WriteLine("Stack Trace: " + ex.StackTrace);
+
+                // Rethrow or handle the exception based on your application needs
+                throw;
+            }
         }
 
         // Method to expire the checkout session
@@ -152,16 +198,16 @@ namespace Restore_backend_deployment_.Controllers
             var subject = "Your Payment Receipt";
             var body = BuildEmailBody(receipt);
 
-            using (var smtpClient = new SmtpClient("smtp.your-email-provider.com") // Update with your SMTP server
+            using (var smtpClient = new SmtpClient("smtp.gmail.com")
             {
-                Port = 587, // or your SMTP port
-                Credentials = new NetworkCredential("your-email@example.com", "your-email-password"), // Update with your credentials
+                Port = 587, 
+                Credentials = new NetworkCredential(_smtpEmail, _smtpPassword),
                 EnableSsl = true,
             })
             {
                 var mailMessage = new MailMessage
                 {
-                    From = new MailAddress("your-email@example.com"),
+                    From = new MailAddress(_smtpEmail),
                     Subject = subject,
                     Body = body,
                     IsBodyHtml = true, // Set to true if you're using HTML for body
