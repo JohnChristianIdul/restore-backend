@@ -44,9 +44,8 @@ builder.Services.AddSwaggerGen(c =>
 // Register any other necessary services
 builder.Services.AddSingleton(new PayMongoSettings
 {
-    BaseUrl = Environment.GetEnvironmentVariable("PAYMONGO_BASE_URL"),
     ApiKey = Environment.GetEnvironmentVariable("PAYMONGO_API_KEY")
-})
+});
 
 var app = builder.Build();
 
@@ -107,6 +106,5 @@ public class FileUploadOperationFilter : IOperationFilter
 
 public class PayMongoSettings
 {
-    public string BaseUrl { get; set; }
     public string ApiKey { get; set; }
 }
