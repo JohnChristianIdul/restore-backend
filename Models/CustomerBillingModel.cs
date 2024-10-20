@@ -18,7 +18,7 @@ namespace Restore_backend_deployment_.Models
         [FirestoreProperty]
         public string? Email { get; set; }
         [FirestoreProperty]
-        public string? CheckoutSessionId { get; set; }
+        public string? PaymentId { get; set; }
         [FirestoreProperty]
         public DateTime PaymentDate { get; set; }
         [FirestoreProperty]

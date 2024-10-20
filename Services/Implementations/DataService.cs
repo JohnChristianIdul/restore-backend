@@ -1037,7 +1037,6 @@ namespace ReStore___backend.Services.Implementations
                 }
                 else
                 {
-                    // If the document does not exist, create a new document
                     var customerCredits = new CustomerCredits
                     {
                         Email = email,
