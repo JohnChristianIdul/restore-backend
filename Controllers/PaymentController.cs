@@ -102,22 +102,23 @@ namespace Restore_backend_deployment_.Controllers
         }
 
         [HttpPost("paymongo-webhook")]
-        public async Task<IActionResult> HandlePaymentWebhook([FromBody] dynamic payload)
+        public async Task<IActionResult> HandlePaymentWebhook([FromBody] PayMongoWebhookModel payload)
         {
             // Log the received webhook for debugging purposes
             Console.WriteLine("Received PayMongo Webhook: " + JsonConvert.SerializeObject(payload));
 
             try
             {
-                // Extract relevant data from the payload (e.g., checkout session ID and payment status)
-                var checkoutSessionId = payload.data.attributes.checkout_session_id.ToString();
-                var paymentStatus = payload.data.attributes.status.ToString();
-                var email = payload.data.attributes.billing.email.ToString();
+                // Extract relevant data from the payload
+                var checkoutSessionId = payload.data.id;
+                var paymentStatus = payload.data.attributes.status;
+                var email = payload.data.attributes.billing.email;
 
                 if (paymentStatus == "paid")
                 {
                     // Save customer credits
-                    await _dataService.SaveCustomerCreditsAsync(email, Convert.ToInt32(payload.data.attributes.line_items.quantity.ToString()));
+                    int quantity = payload.data.attributes.line_items.First().quantity;
+                    await _dataService.SaveCustomerCreditsAsync(email, quantity);
 
                     // Save payment receipt
                     var paymentReceipt = new PaymentReceipt
@@ -125,13 +126,13 @@ namespace Restore_backend_deployment_.Controllers
                         Email = email,
                         CheckoutSessionId = checkoutSessionId,
                         PaymentDate = DateTime.UtcNow,
-                        Amount = payload.data.attributes.amount, // Use the amount from webhook payload
+                        Amount = payload.data.attributes.amount,
                         Description = "Buying credits for Restore"
                     };
 
                     await _dataService.SavePaymentReceiptAsync(paymentReceipt);
                     await SendEmailReceiptAsync(email, paymentReceipt);
-                    await ExpireCheckoutSession(checkoutSessionId); // Optionally expire session
+                    await ExpireCheckoutSession(checkoutSessionId);
 
                     return Ok(new { message = "Payment processed successfully." });
                 }
