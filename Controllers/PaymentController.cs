@@ -27,7 +27,7 @@ namespace Restore_backend_deployment_.Controllers
         {
             _configuration = configuration;
             _payMongoBaseUrl = "https://api.paymongo.com/v1/checkout_sessions";
-            _payMongoApiKey = Environment.GetEnvironmentVariable("PAYMONGO_SECRET_KEY");
+            _payMongoApiKey = Environment.GetEnvironmentVariable("PAYMONGO_SECRET_KEY") ?? throw new ArgumentNullException("PayMongo API Key is not set in environment variables."); ;
             _smtpPassword = Environment.GetEnvironmentVariable("SMTP_EMAIL_PASSWORD");
             _smtpEmail = Environment.GetEnvironmentVariable("SMTP_EMAIL");
             _dataService = dataService;
