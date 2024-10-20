@@ -114,6 +114,7 @@ namespace Restore_backend_deployment_.Controllers
             {
                 // Fetch the checkout session details from PayMongo
                 var checkoutSessionDetails = await GetCheckoutSessionDetails(sessionId);
+                Console.WriteLine(checkoutSessionDetails.data.attributes.billing.status);
 
                 if (checkoutSessionDetails == null)
                 {
