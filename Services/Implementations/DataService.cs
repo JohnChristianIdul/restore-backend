@@ -1014,23 +1014,75 @@ namespace ReStore___backend.Services.Implementations
         }
         public async Task SaveCustomerCreditsAsync(string email, int credits)
         {
-            var customerCredits = new CustomerCredits
-            {
-                Email = email,
-                CreditsRemaining = credits
-            };
-
             try
             {
                 CollectionReference creditsCollection = _firestoreDb.Collection("customerCredits");
-                // Save the customer credits to Firestore
-                await creditsCollection.Document(email).SetAsync(customerCredits);
-                Console.WriteLine("Customer credits saved successfully.");
+                DocumentReference documentReference = creditsCollection.Document(email);
+
+                // Get the document to check if it exists
+                DocumentSnapshot documentSnapshot = await documentReference.GetSnapshotAsync();
+
+                if (documentSnapshot.Exists)
+                {
+                    // If the document exists, update the CreditsRemaining field
+                    var existingCredits = documentSnapshot.GetValue<int>("CreditsRemaining");
+                    var updatedCredits = existingCredits + credits;
+
+                    await documentReference.UpdateAsync(new { CreditsRemaining = updatedCredits });
+                    Console.WriteLine("Customer credits updated successfully.");
+                }
+                else
+                {
+                    // If the document does not exist, create a new document
+                    var customerCredits = new CustomerCredits
+                    {
+                        Email = email,
+                        CreditsRemaining = credits
+                    };
+
+                    await documentReference.SetAsync(customerCredits);
+                    Console.WriteLine("Customer credits saved successfully.");
+                }
             }
             catch (Exception ex)
             {
                 // Log the error details
                 Console.WriteLine($"Error saving customer credits: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
+                }
+                throw; // Rethrow or handle as necessary
+            }
+        }
+
+        public async Task<int> GetCustomerCreditsAsync(string email)
+        {
+            try
+            {
+                CollectionReference creditsCollection = _firestoreDb.Collection("customerCredits");
+                DocumentReference documentReference = creditsCollection.Document(email);
+
+                // Get the document snapshot
+                DocumentSnapshot documentSnapshot = await documentReference.GetSnapshotAsync();
+
+                if (documentSnapshot.Exists)
+                {
+                    // If the document exists, retrieve the CreditsRemaining
+                    int creditsRemaining = documentSnapshot.GetValue<int>("CreditsRemaining");
+                    Console.WriteLine($"Customer credits retrieved successfully for {email}: {creditsRemaining}");
+                    return creditsRemaining;
+                }
+                else
+                {
+                    Console.WriteLine($"No credits found for email: {email}");
+                    return 0; // or throw an exception based on your requirement
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log the error details
+                Console.WriteLine($"Error retrieving customer credits: {ex.Message}");
                 if (ex.InnerException != null)
                 {
                     Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");

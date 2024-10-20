@@ -26,5 +26,6 @@ namespace ReStore___backend.Services.Interfaces
         Task SaveCustomerCreditsAsync(string email, int credits);
         Task DecreaseCreditsAsync(string email, int amount);
         Task SavePaymentReceiptAsync(PaymentReceipt receipt);
+        Task<int> GetCustomerCreditsAsync(string email);
     }
 }

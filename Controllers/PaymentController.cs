@@ -122,8 +122,8 @@ namespace Restore_backend_deployment_.Controllers
             return BadRequest(new { message = "Payment failed." });
         }
 
-        [HttpGet("{email}/credits")]
-        public async Task<IActionResult> GetCustomerCredits(string email)
+        [HttpGet("customer-credits")]
+        public async Task<IActionResult> GetCustomerCredits([FromQuery] string email)
         {
             if (string.IsNullOrEmpty(email))
             {
