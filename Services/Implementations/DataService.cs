@@ -1067,33 +1067,22 @@ namespace ReStore___backend.Services.Implementations
                 CollectionReference creditsCollection = _firestoreDb.Collection("customerCredits");
                 DocumentReference documentReference = creditsCollection.Document(email);
 
-                // Get the document to check if it exists
+                // Find the document
                 DocumentSnapshot documentSnapshot = await documentReference.GetSnapshotAsync();
 
-                if (documentSnapshot.Exists)
+               
+                int existingCredits = documentSnapshot.GetValue<int>("CreditsRemaining");
+                int updatedCredits = existingCredits + credits;
+
+                var updates = new Dictionary<string, object>
                 {
-                    var existingCredits = documentSnapshot.GetValue<int>("CreditsRemaining");
-                    int updatedCredits = existingCredits + credits;
+                    { "email", email },
+                    { "CreditsRemaining", updatedCredits }
+                };
 
-                    var updates = new Dictionary<string, object>
-                    {
-                        { "CreditsRemaining", updatedCredits }
-                    };
-
-                    await documentReference.UpdateAsync(updates);
-                    Console.WriteLine("Customer credits updated successfully.");
-                }
-                else
-                {
-                    var customerCredits = new CustomerCredits
-                    {
-                        Email = email,
-                        CreditsRemaining = credits
-                    };
-
-                    await documentReference.SetAsync(customerCredits);
-                    Console.WriteLine("Customer credits saved successfully.");
-                }
+                await documentReference.UpdateAsync(updates);
+                Console.WriteLine("Customer credits updated successfully.");
+               
             }
             catch (Exception ex)
             {
