@@ -152,9 +152,9 @@ namespace Restore_backend_deployment_.Controllers
                     var paymentReceipt = new PaymentReceipt
                     {
                         Email = email,
-                        PaymentId = checkoutSessionDetails.payment_intent.id.ToString(),
+                        PaymentId = checkoutSessionDetails.data.payment_intent.id.ToString(),
                         PaymentDate = DateTime.UtcNow,
-                        Amount = int.Parse(checkoutSessionDetails.data.attributes.amount),
+                        Amount = int.Parse(checkoutSessionDetails.data.attributes.amount.ToString()),
                         Description = "Buying credits for Restore",
                         Quantity = quantity
                     };
