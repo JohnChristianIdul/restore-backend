@@ -26,7 +26,7 @@ namespace Restore_backend_deployment_.Models
         [FirestoreProperty]
         public string? Description { get; set; }
         [FirestoreProperty]
-        public Int32 Quantity { get; set; }
+        public int Quantity { get; set; }
     }
 
 }

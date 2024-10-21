@@ -141,18 +141,19 @@ namespace Restore_backend_deployment_.Controllers
                         return BadRequest(new { message = "No line items found in the checkout session." });
                     }
 
+                    int quantity = lineItems[0]["quantity"];
+                    string paymentId = payments[0]["id"].ToString();
+                    int amountPaid = lineItems[0]["amount"]/10;
+                    Console.WriteLine($"Quantity: {quantity}, Total: {amountPaid}, Reference Id: {paymentId}");
 
-                    int quantity = lineItems[0]["quantity"]; 
-                    Console.WriteLine($"Email: {email}, PaymentID = {checkoutSessionDetails.data.attributes.payments[0].id.ToString()}, Amount = {int.Parse(lineItems[0]["amount"])}, Quantity = {quantity}");
-                    Console.WriteLine($"SessionID = {sessionId}");
                     await _dataService.SaveCustomerCreditsAsync(email.ToString(), quantity);
                                         
                     var paymentReceipt = new PaymentReceipt
                     {
                         Email = email,
-                        PaymentId = checkoutSessionDetails.data.attributes.payments[0].id.ToString(),
+                        PaymentId = paymentId,
                         PaymentDate = DateTime.UtcNow,
-                        Amount = int.Parse(lineItems[0].amount),
+                        Amount = amountPaid,
                         Description = "Buying credits for Restore",
                         Quantity = quantity
                     };
