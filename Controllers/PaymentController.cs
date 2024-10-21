@@ -152,7 +152,7 @@ namespace Restore_backend_deployment_.Controllers
                     {
                         Console.WriteLine("Payment ID is empty");
                     }
-                    if (int.Parse(lineItems[0].amount.ToString()) == null)
+                    if (int.Parse(lineItems[0].amount) == null)
                     {
                         Console.WriteLine("amount is empty");
                     }
