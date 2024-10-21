@@ -155,9 +155,6 @@ namespace Restore_backend_deployment_.Controllers
                     string paymentId = payments[0]["id"].ToString();
                     int amountPaid = lineItems[0]["amount"] / 10;
 
-                    // Log line items and payment information
-                    Console.WriteLine($"Quantity: {quantity}, Amount Paid: {amountPaid}, Payment ID: {paymentId}");
-
                     // Attempt to save customer credits
                     Console.WriteLine("Saving customer credits...");
                     await _dataService.SaveCustomerCreditsAsync(email, quantity);
@@ -178,11 +175,6 @@ namespace Restore_backend_deployment_.Controllers
                     Console.WriteLine("Saving payment receipt...");
                     await _dataService.SavePaymentReceiptAsync(paymentReceipt);
                     Console.WriteLine("Payment receipt saved successfully.");
-
-                    // Expire checkout session
-                    Console.WriteLine("Expiring checkout session...");
-                    await ExpireCheckoutSession(sessionId);
-                    Console.WriteLine("Checkout session expired successfully.");
 
                     return Ok(new { message = "Payment processed successfully." });
                 }
@@ -312,22 +304,6 @@ namespace Restore_backend_deployment_.Controllers
 
                 throw;
             }
-        }
-
-        public async Task ExpireCheckoutSession(string sessionId)
-        {
-            var options = new RestClientOptions($"https://api.paymongo.com/v1/checkout_sessions/{sessionId}/expire");
-            var client = new RestClient(options);
-            var request = new RestRequest();
-            request.AddHeader("accept", "application/json");
-            request.AddHeader("authorization", $"Basic {Convert.ToBase64String(Encoding.UTF8.GetBytes(_payMongoApiKey))}");
-
-            var response = await client.PostAsync(request);
-            if (!response.IsSuccessful)
-            {
-                // Log the error or handle it as needed
-                throw new Exception("Failed to expire checkout session: " + response.Content);
-            }
-        }
+        }        
     }
 }
