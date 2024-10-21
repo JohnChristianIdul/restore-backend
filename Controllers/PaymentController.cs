@@ -114,23 +114,32 @@ namespace Restore_backend_deployment_.Controllers
             try
             {
                 // Fetch the checkout session details from PayMongo
+                Console.WriteLine("Fetching checkout session details...");
                 var checkoutSessionDetails = await GetCheckoutSessionDetails(sessionId);
 
                 if (checkoutSessionDetails == null)
                 {
+                    Console.WriteLine("Failed to retrieve checkout session details for session ID: " + sessionId);
                     return BadRequest(new { message = "Failed to retrieve checkout session details." });
                 }
+
+                // Log the fetched session details
+                Console.WriteLine("Checkout session details fetched successfully.");
 
                 // Extract relevant data from the checkout session details
                 var payments = checkoutSessionDetails.data.attributes.payments;
 
                 if (payments.Count == 0)
                 {
+                    Console.WriteLine("No payment information found in the session.");
                     return BadRequest(new { message = "No payment information found" });
                 }
 
                 var paymentStatus = payments[0]["attributes"]["status"].ToString();
                 var email = checkoutSessionDetails.data.attributes.billing.email.ToString();
+
+                // Log payment status
+                Console.WriteLine($"Payment status: {paymentStatus}, Email: {email}");
 
                 if (paymentStatus == "paid")
                 {
@@ -138,16 +147,23 @@ namespace Restore_backend_deployment_.Controllers
 
                     if (!lineItems.HasValues)
                     {
+                        Console.WriteLine("No line items found in the checkout session.");
                         return BadRequest(new { message = "No line items found in the checkout session." });
                     }
 
                     int quantity = lineItems[0]["quantity"];
                     string paymentId = payments[0]["id"].ToString();
-                    int amountPaid = lineItems[0]["amount"]/10;
-                    Console.WriteLine($"Quantity: {quantity}, Total: {amountPaid}, Reference Id: {paymentId}");
+                    int amountPaid = lineItems[0]["amount"] / 10;
 
-                    await _dataService.SaveCustomerCreditsAsync(email.ToString(), quantity);
-                                        
+                    // Log line items and payment information
+                    Console.WriteLine($"Quantity: {quantity}, Amount Paid: {amountPaid}, Payment ID: {paymentId}");
+
+                    // Attempt to save customer credits
+                    Console.WriteLine("Saving customer credits...");
+                    await _dataService.SaveCustomerCreditsAsync(email, quantity);
+                    Console.WriteLine("Customer credits saved successfully.");
+
+                    // Create payment receipt
                     var paymentReceipt = new PaymentReceipt
                     {
                         Email = email,
@@ -158,16 +174,26 @@ namespace Restore_backend_deployment_.Controllers
                         Quantity = quantity
                     };
 
+                    // Attempt to save payment receipt
+                    Console.WriteLine("Saving payment receipt...");
                     await _dataService.SavePaymentReceiptAsync(paymentReceipt);
+                    Console.WriteLine("Payment receipt saved successfully.");
+
+                    // Expire checkout session
+                    Console.WriteLine("Expiring checkout session...");
                     await ExpireCheckoutSession(sessionId);
+                    Console.WriteLine("Checkout session expired successfully.");
 
                     return Ok(new { message = "Payment processed successfully." });
                 }
 
+                // Log if payment status was not "paid"
+                Console.WriteLine($"Payment was not successful. Status: {paymentStatus}");
                 return BadRequest(new { message = "Payment not successful or status unknown." });
             }
             catch (Exception ex)
             {
+                // Log the exception details for debugging
                 Console.WriteLine("Error processing webhook: " + ex.Message);
                 return StatusCode(500, "Internal server error while processing payment.");
             }
