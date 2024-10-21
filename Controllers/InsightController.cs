@@ -24,9 +24,9 @@ namespace ReStore___backend.Controllers
 
         // GET: api/insights/{email}
         [HttpGet("{email}")]
-        public async Task<IActionResult> GetInsights(string email)
+        public async Task<IActionResult> GetInsights(string username)
         {
-            var insightJson = await _dataService.GetSalesInsightByEmail(email);
+            var insightJson = await _dataService.GetSalesInsightByUsername(username);
 
             // Return the JSON file of the insight
             return Content(insightJson, "application/json");

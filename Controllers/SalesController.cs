@@ -17,11 +17,14 @@ namespace ReStore___backend.Controllers
         }
 
         [HttpPost("upload/sales")]
-        public async Task<IActionResult> UploadSalesFile(IFormFile file, [FromForm] string email)
+        public async Task<IActionResult> UploadSalesFile(IFormFile file, [FromForm] string username, [FromForm] string email)
         {
             if (file == null || file.Length == 0)
                 return BadRequest(new { error = "No file provided." });
 
+            if (string.IsNullOrEmpty(username))
+                return BadRequest(new { error = "Username is required." });
+            
             if (string.IsNullOrEmpty(email))
                 return BadRequest(new { error = "Email is required." });
 
@@ -41,7 +44,7 @@ namespace ReStore___backend.Controllers
 
                     // Call the service to process and upload the data
                     Console.WriteLine($"{email}");
-                    await _dataService.ProcessAndUploadDataSales(records, email);
+                    await _dataService.ProcessAndUploadDataSales(records, username, email);
 
                     return Ok(new { success = "Data processed and uploaded to Cloud Storage" });
                 }
@@ -54,15 +57,15 @@ namespace ReStore___backend.Controllers
 
         // GET method to retrieve sales data for a specific user
         [HttpGet("sales/{email}")]
-        public async Task<IActionResult> GetSalesData(string email)
+        public async Task<IActionResult> GetSalesData(string username)
         {
-            if (string.IsNullOrEmpty(email))
-                return BadRequest(new { error = "Email is required." });
+            if (string.IsNullOrEmpty(username))
+                return BadRequest(new { error = "Username is required." });
 
             try
             {
                 // Call the service to get sales data
-                var salesDataJson = await _dataService.GetSalesDataFromStorageByEmail(email);
+                var salesDataJson = await _dataService.GetSalesDataFromStorageByUsername(username);
                 return Ok(new { data = salesDataJson });
             }
             catch (Exception ex)

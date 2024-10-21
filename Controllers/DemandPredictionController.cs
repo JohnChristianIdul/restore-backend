@@ -22,10 +22,10 @@ namespace ReStore___backend.Controllers
             _dataService = dataService;
         }
 
-        [HttpGet("prediction/{email}")]
-        public async Task<IActionResult> GetDemandPrediction(string email)
+        [HttpGet("prediction/{username}")]
+        public async Task<IActionResult> GetDemandPrediction(string username)
         {
-            var result = await _dataService.GetDemandPrediction(email);
+            var result = await _dataService.GetDemandPrediction(username);
             if (result is string && result.StartsWith("Error"))
             {
                 return BadRequest(result); // or another appropriate status code

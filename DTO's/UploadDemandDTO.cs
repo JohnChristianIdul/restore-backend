@@ -2,7 +2,7 @@
 {
     public class UploadDemandDTO
     {
-        public string email { get; set; }
+        public string username { get; set; }
         public IFormFile File { get; set; }
     }
 }
