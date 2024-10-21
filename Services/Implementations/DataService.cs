@@ -221,7 +221,7 @@ namespace ReStore___backend.Services.Implementations
                 var mailMessage = new MailMessage
                 {
                     From = new MailAddress(_smtpEmail),
-                    Subject = "Verify your email",
+                    Subject = "Verify your Email",
                     IsBodyHtml = true,
                     Body = $@"
                     <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; flex-direction=row'>
@@ -418,7 +418,7 @@ namespace ReStore___backend.Services.Implementations
                 }
             }
         }
-        public async Task<string> GetDemandDataFromStorageByUsername(string email)
+        public async Task<string> GetDemandDataFromStorageByEmail(string email)
         {
             var demandData = new List<dynamic>();
 
@@ -513,7 +513,7 @@ namespace ReStore___backend.Services.Implementations
                 await SalesInsight(salesInsightStream, email);
             }
         }
-        public async Task<string> GetSalesDataFromStorageByUsername(string email)
+        public async Task<string> GetSalesDataFromStorageByEmail(string email)
         {
             var salesData = new List<SaleRecordDTO>();
 
@@ -639,7 +639,7 @@ namespace ReStore___backend.Services.Implementations
             // Return the clean JSON string
             return jsonData.Replace("\\n", ""); // Remove any unwanted newlines from the JSON string
         }
-        public async Task<string> SalesInsight(MemoryStream salesData, string username)
+        public async Task<string> SalesInsight(MemoryStream salesData, string email)
         {
             // Call your API to get the insights
             string insights;
@@ -696,7 +696,7 @@ namespace ReStore___backend.Services.Implementations
             Console.WriteLine(csvContent);
 
             // Upload the CSV to Firebase Storage
-            var storagePath = $"Insight/{username}-sales-insight/sales_insights.csv"; // Define your storage path
+            var storagePath = $"Insight/{email}-sales-insight/sales_insights.csv"; // Define your storage path
             using (var uploadStream = new MemoryStream(Encoding.UTF8.GetBytes(csvContent)))
             {
                 await _storageClient.UploadObjectAsync(_bucketName, storagePath, "text/csv", uploadStream);
@@ -704,12 +704,12 @@ namespace ReStore___backend.Services.Implementations
 
             return insightsText; // Optionally return the cleaned insights text
         }
-        public async Task<string> GetSalesInsightByUsername(string username)
+        public async Task<string> GetSalesInsightByEmail(string email)
         {
             var insightData = new List<InsightDTO>();
 
             // Define the path to the storage bucket and directory
-            string folderPath = $"Insight/{username}-sales-insight/";
+            string folderPath = $"Insight/{email}-sales-insight/";
             Console.WriteLine($"Folder path: {folderPath}");
 
             // Get the list of objects in the specified folder
@@ -754,13 +754,13 @@ namespace ReStore___backend.Services.Implementations
             // Convert the list to JSON and return
             return JsonConvert.SerializeObject(insightData);
         }
-        public async Task<string> PredictDemand(string username)
+        public async Task<string> PredictDemand(string email)
         {
             try
             {
                 using (var form = new MultipartFormDataContent())
                 {
-                    form.Add(new StringContent(username), "username");
+                    form.Add(new StringContent(email), "email");
 
                     string baseUrl = Environment.GetEnvironmentVariable("API_URL");
 
@@ -821,7 +821,7 @@ namespace ReStore___backend.Services.Implementations
                     form.Add(streamContent, "file", $"{email}_file.csv"); // Use username for clarity
 
                     // Add the username
-                    form.Add(new StringContent(email), "username");
+                    form.Add(new StringContent(email), "email");
 
                     string baseUrl = Environment.GetEnvironmentVariable("API_URL");
 
@@ -847,7 +847,7 @@ namespace ReStore___backend.Services.Implementations
                 return $"Error during model training: {ex.Message}";
             }
         }
-        public async Task<string> TrainSalesModel(MemoryStream file, string username)
+        public async Task<string> TrainSalesModel(MemoryStream file, string email)
         {
             try
             {
@@ -864,7 +864,7 @@ namespace ReStore___backend.Services.Implementations
                 {
                     // Add the MemoryStream as file content with a proper filename
                     form.Add(new StreamContent(file), "file", "sales_data.csv");
-                    form.Add(new StringContent(username), "username");
+                    form.Add(new StringContent(email), "email");
 
                     // Send the request to train the model
                     HttpResponseMessage response = await _httpClient.PostAsync($"{baseUrl}/train_model", form);

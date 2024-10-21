@@ -18,13 +18,13 @@ namespace ReStore___backend.Controllers
         }
 
         [HttpPost("upload/demand")]
-        public async Task<IActionResult> UploadDemandFile(IFormFile file, [FromForm] string username)
+        public async Task<IActionResult> UploadDemandFile(IFormFile file, [FromForm] string email)
         {
             if (file == null || file.Length == 0)
                 return BadRequest(new { error = "No file provided." });
 
-            if (string.IsNullOrEmpty(username))
-                return BadRequest(new { error = "Username is required." });
+            if (string.IsNullOrEmpty(email))
+                return BadRequest(new { error = "Email is required." });
 
             try
             {
@@ -41,8 +41,8 @@ namespace ReStore___backend.Controllers
                     var records = csv.GetRecords<dynamic>().ToList();
 
                     // Call the service to process and upload the data
-                    Console.WriteLine($"{username}");
-                    await _dataService.ProcessAndUploadDataDemands(records, username);
+                    Console.WriteLine($"{email}");
+                    await _dataService.ProcessAndUploadDataDemands(records, email);
 
                     return Ok(new { success = "Data processed and uploaded to Cloud Storage" });
                 }
@@ -53,12 +53,12 @@ namespace ReStore___backend.Controllers
             }
         }
 
-        [HttpGet("demand/{username}")]
-        public async Task<IActionResult> GetDemandData(string username)
+        [HttpGet("demand/{email}")]
+        public async Task<IActionResult> GetDemandData(string email)
         {
             try
             {
-                string demandDataJson = await _dataService.GetDemandDataFromStorageByUsername(username);
+                string demandDataJson = await _dataService.GetDemandDataFromStorageByEmail(email);
                 return Ok(demandDataJson);
             }
             catch (Exception ex)

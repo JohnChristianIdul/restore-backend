@@ -17,13 +17,13 @@ namespace ReStore___backend.Controllers
         }
 
         [HttpPost("upload/sales")]
-        public async Task<IActionResult> UploadSalesFile(IFormFile file, [FromForm] string username)
+        public async Task<IActionResult> UploadSalesFile(IFormFile file, [FromForm] string email)
         {
             if (file == null || file.Length == 0)
                 return BadRequest(new { error = "No file provided." });
 
-            if (string.IsNullOrEmpty(username))
-                return BadRequest(new { error = "Username is required." });
+            if (string.IsNullOrEmpty(email))
+                return BadRequest(new { error = "Email is required." });
 
             try
             {
@@ -40,8 +40,8 @@ namespace ReStore___backend.Controllers
                     var records = csv.GetRecords<dynamic>().ToList();
 
                     // Call the service to process and upload the data
-                    Console.WriteLine($"{username}");
-                    await _dataService.ProcessAndUploadDataSales(records, username);
+                    Console.WriteLine($"{email}");
+                    await _dataService.ProcessAndUploadDataSales(records, email);
 
                     return Ok(new { success = "Data processed and uploaded to Cloud Storage" });
                 }
@@ -53,16 +53,16 @@ namespace ReStore___backend.Controllers
         }
 
         // GET method to retrieve sales data for a specific user
-        [HttpGet("sales/{username}")]
-        public async Task<IActionResult> GetSalesData(string username)
+        [HttpGet("sales/{email}")]
+        public async Task<IActionResult> GetSalesData(string email)
         {
-            if (string.IsNullOrEmpty(username))
-                return BadRequest(new { error = "Username is required." });
+            if (string.IsNullOrEmpty(email))
+                return BadRequest(new { error = "Email is required." });
 
             try
             {
                 // Call the service to get sales data
-                var salesDataJson = await _dataService.GetSalesDataFromStorageByUsername(username);
+                var salesDataJson = await _dataService.GetSalesDataFromStorageByEmail(email);
                 return Ok(new { data = salesDataJson });
             }
             catch (Exception ex)

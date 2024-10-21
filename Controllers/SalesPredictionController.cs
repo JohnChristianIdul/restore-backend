@@ -15,9 +15,9 @@ namespace ReStore___backend.Controllers
         }
 
         [HttpGet("prediction")]
-        public async Task<IActionResult> GetDemandPrediction([FromQuery] string username)
+        public async Task<IActionResult> GetDemandPrediction([FromQuery] string email)
         {
-            var result = await _dataService.GetSalesPrediction(username);
+            var result = await _dataService.GetSalesPrediction(email);
             return Ok(result);
         }
     }
