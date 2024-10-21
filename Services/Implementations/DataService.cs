@@ -244,7 +244,7 @@ namespace ReStore___backend.Services.Implementations
                     </div>"
                 };
 
-                string logoPath = Path.Combine(Directory.GetCurrentDirectory(), "/Restore.png");
+                string logoPath = Path.Combine(Directory.GetCurrentDirectory(), "Restore.png");
                 var logo = new LinkedResource(logoPath)
                 {
                     ContentId = "logoImage"
