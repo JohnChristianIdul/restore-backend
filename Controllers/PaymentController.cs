@@ -316,12 +316,7 @@ namespace Restore_backend_deployment_.Controllers
 
         public async Task ExpireCheckoutSession(string sessionId)
         {
-            var options = new RestClientOptions($"https://api.paymongo.com/v1/checkout_sessions/{sessionId}/expire")
-            {
-                ThrowOnAnyError = true,
-                Timeout = TimeSpan.FromMilliseconds(3000)
-            };
-
+            var options = new RestClientOptions($"https://api.paymongo.com/v1/checkout_sessions/{sessionId}/expire");
             var client = new RestClient(options);
             var request = new RestRequest();
             request.AddHeader("accept", "application/json");
