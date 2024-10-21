@@ -159,7 +159,6 @@ namespace Restore_backend_deployment_.Controllers
                     };
 
                     await _dataService.SavePaymentReceiptAsync(paymentReceipt);
-                    await SendEmailReceiptAsync(email, paymentReceipt);
                     await ExpireCheckoutSession(sessionId);
 
                     return Ok(new { message = "Payment processed successfully." });
@@ -308,45 +307,6 @@ namespace Restore_backend_deployment_.Controllers
                 // Log the error or handle it as needed
                 throw new Exception("Failed to expire checkout session: " + response.Content);
             }
-        }
-        public async Task SendEmailReceiptAsync(string email, PaymentReceipt receipt)
-        {
-            var subject = "Your Payment Receipt";
-            var body = BuildEmailBody(receipt);
-
-            using (var smtpClient = new SmtpClient("smtp.gmail.com")
-            {
-                Port = 587, 
-                Credentials = new NetworkCredential(_smtpEmail, _smtpPassword),
-                EnableSsl = true,
-            })
-            {
-                var mailMessage = new MailMessage
-                {
-                    From = new MailAddress(_smtpEmail),
-                    Subject = subject,
-                    Body = body,
-                    IsBodyHtml = true,
-                };
-
-                mailMessage.To.Add(email);
-
-                await smtpClient.SendMailAsync(mailMessage);
-            }
-        }
-        public string BuildEmailBody(PaymentReceipt receipt)
-        {
-            var sb = new StringBuilder();
-            sb.Append("<div style='border: 1px solid #000; padding: 10px; width: 300px;'>");
-            sb.Append("<h2 style='text-align: center;'>Payment Receipt</h2>");
-            sb.Append("<p><strong>Email:</strong> " + receipt.Email + "</p>");
-            sb.Append("<p><strong>Payment ID:</strong> " + receipt.PaymentId + "</p>");
-            sb.Append("<p><strong>Payment Date:</strong> " + receipt.PaymentDate.ToString("g") + "</p>");
-            sb.Append("<p><strong>Amount:</strong> " + (receipt.Amount / 100m).ToString("C") + "</p>");
-            sb.Append("<p><strong>Description:</strong> " + receipt.Description + "</p>");
-            sb.Append("</div>");
-
-            return sb.ToString();
         }
     }
 }
