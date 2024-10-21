@@ -294,6 +294,7 @@ namespace ReStore___backend.Services.Implementations
                     {
                         Token = null,
                         Username = null,
+                        Email = null,
                         ErrorMessage = "Authentication failed. Please check your email and password."
                     };
                 }
@@ -304,6 +305,7 @@ namespace ReStore___backend.Services.Implementations
                     {
                         Token = null,
                         Username = null,
+                        Email = null,
                         ErrorMessage = "Email is not verified. Please verify your email before logging in."
                     };
                 }
@@ -322,6 +324,7 @@ namespace ReStore___backend.Services.Implementations
                     return new LoginResultDTO
                     {
                         Token = auth.FirebaseToken,
+                        Email = null,
                         Username = null
                     };
                 }
@@ -332,7 +335,8 @@ namespace ReStore___backend.Services.Implementations
                 return new LoginResultDTO
                 {
                     Token = auth.FirebaseToken,
-                    Username = username
+                    Username = username,
+                    Email = email
                 };
             }
             catch (Exception ex)
@@ -342,6 +346,7 @@ namespace ReStore___backend.Services.Implementations
                 {
                     Token = null,
                     Username = null,
+                    Email= null,
                     ErrorMessage = $"Error during login: {ex.Message}"
                 };
             }

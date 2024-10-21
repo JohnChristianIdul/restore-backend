@@ -77,7 +77,8 @@ namespace ReStore___backend.Controllers
                 {
                     message = "Login successful!",
                     token = loginResult.Token,
-                    username = loginResult.Username
+                    username = loginResult.Username,
+                    email = loginResult.Email
                 });
             }
             catch (Exception ex)
