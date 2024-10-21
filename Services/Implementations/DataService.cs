@@ -136,6 +136,13 @@ namespace ReStore___backend.Services.Implementations
                 };
                 await _firestoreDb.Collection("Users").Document(authResult.Uid).SetAsync(userDoc);
 
+                var userCred = new Dictionary<string, object>
+                {
+                    { "CreditsRemaining", 0 },
+                    { "email", email }
+                };
+                await _firestoreDb.Collection("customerCredits").Document(email).SetAsync(userCred);
+
                 return "User created successfully. Please verify your email to complete the sign-up process.";
             }
             catch (FirebaseAuthException fae)
