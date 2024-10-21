@@ -224,8 +224,8 @@ namespace ReStore___backend.Services.Implementations
                     Subject = "Verify your Email",
                     IsBodyHtml = true,
                     Body = $@"
-                    <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; flex-direction=row'>
-                        <div style='background-color: #00210b; color: white; padding: 20px; text-align: center;'>
+                    <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+                        <div style='background-color: #30A75F; color: white; padding: 20px; text-align: center;'>
                             <img src='cid:logoImage' alt='Restore Logo' style='height: 50px; margin-right: 10px;' />
                             <h2 style='margin: 0;'>Restore</h2>
                         </div>
