@@ -141,30 +141,9 @@ namespace Restore_backend_deployment_.Controllers
                         return BadRequest(new { message = "No line items found in the checkout session." });
                     }
 
-                    int quantity = lineItems[0]["quantity"]; 
 
-                    Console.WriteLine($"Quantity value is {quantity}.");
-                    if(email == null)
-                    {
-                        Console.WriteLine("Email is empty");
-                    }
-                    if (checkoutSessionDetails.data.attributes.payments[0].id.ToString() == null)
-                    {
-                        Console.WriteLine("Payment ID is empty");
-                    }
-                    if (int.Parse(lineItems[0].amount) == null)
-                    {
-                        Console.WriteLine("amount is empty");
-                    }
-                    if(quantity == null)
-                    {
-                        Console.WriteLine("Quantity is empty");
-                    }
-                    if (sessionId == null)
-                    {
-                        Console.WriteLine("Session ID is empty");
-                    }
-                    Console.WriteLine($"Email: {email}, PaymentID = {checkoutSessionDetails.data.attributes.payments[0].id.ToString()}, Amount = {int.Parse(lineItems[0].amount)}, Quantity = {quantity}");
+                    int quantity = lineItems[0]["quantity"]; 
+                    Console.WriteLine($"Email: {email}, PaymentID = {checkoutSessionDetails.data.attributes.payments[0].id.ToString()}, Amount = {int.Parse(lineItems[0]["amount"])}, Quantity = {quantity}");
                     Console.WriteLine($"SessionID = {sessionId}");
                     await _dataService.SaveCustomerCreditsAsync(email.ToString(), quantity);
                                         
@@ -173,7 +152,7 @@ namespace Restore_backend_deployment_.Controllers
                         Email = email,
                         PaymentId = checkoutSessionDetails.data.attributes.payments[0].id.ToString(),
                         PaymentDate = DateTime.UtcNow,
-                        Amount = int.Parse(lineItems[0].amount.ToString()),
+                        Amount = int.Parse(lineItems[0].amount),
                         Description = "Buying credits for Restore",
                         Quantity = quantity
                     };
