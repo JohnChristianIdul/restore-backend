@@ -148,11 +148,11 @@ namespace Restore_backend_deployment_.Controllers
                     {
                         Console.WriteLine("Email is empty");
                     }
-                    if (checkoutSessionDetails.data.attributes.payments[0].id.ToString() == null)
+                    if (checkoutSessionDetails.data.attributes.payments[0]["id"].ToString() == null)
                     {
                         Console.WriteLine("Payment ID is empty");
                     }
-                    if (int.Parse(lineItems[0].amount) == null)
+                    if (int.Parse(lineItems[0]["attributes"]["amount"]) == null)
                     {
                         Console.WriteLine("amount is empty");
                     }
@@ -164,16 +164,16 @@ namespace Restore_backend_deployment_.Controllers
                     {
                         Console.WriteLine("Session ID is empty");
                     }
-                    Console.WriteLine($"Email: {email}, PaymentID = {checkoutSessionDetails.data.attributes.payments[0].id.ToString()}, Amount = {int.Parse(lineItems[0].amount)}, Quantity = {quantity}");
+                    Console.WriteLine($"Email: {email}, PaymentID = {checkoutSessionDetails.data.attributes.payments[0]["id"].ToString()}, Amount = {int.Parse(lineItems[0]["attributes"]["amount"].ToString())}, Quantity = {quantity}");
                     Console.WriteLine($"SessionID = {sessionId}");
                     await _dataService.SaveCustomerCreditsAsync(email.ToString(), quantity);
                                         
                     var paymentReceipt = new PaymentReceipt
                     {
                         Email = email,
-                        PaymentId = checkoutSessionDetails.data.attributes.payments[0].id.ToString(),
+                        PaymentId = checkoutSessionDetails.data.attributes.payments[0]["id"].ToString(),
                         PaymentDate = DateTime.UtcNow,
-                        Amount = int.Parse(lineItems[0].amount.ToString()),
+                        Amount = int.Parse(lineItems[0]["attributes"]["amount"].ToString()),
                         Description = "Buying credits for Restore",
                         Quantity = quantity
                     };
