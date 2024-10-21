@@ -371,7 +371,7 @@ namespace ReStore___backend.Services.Implementations
 
             await smtpClient.SendMailAsync(emailMessage);
         }
-        public async Task ProcessAndUploadDataDemands(IEnumerable<dynamic> records, string username)
+        public async Task ProcessAndUploadDataDemands(IEnumerable<dynamic> records, string email)
         {
             var recordList = records.ToList();
 
@@ -379,10 +379,10 @@ namespace ReStore___backend.Services.Implementations
             var groupedRecords = recordList.GroupBy(record => record.ProductID);
 
             // Create new folder in Cloud Storage
-            var folderPath = $"upload_demands/{username}-upload-demands/";
+            var folderPath = $"upload_demands/{email}-upload-demands/";
 
             // Decrease credits for each demand processed
-            await DecreaseCreditsAsync(username, 1); // Deduct 1 credit
+            await DecreaseCreditsAsync(email, 1); // Deduct 1 credit
 
             foreach (var group in groupedRecords)
             {
@@ -411,19 +411,19 @@ namespace ReStore___backend.Services.Implementations
 
                     // Call TrainDemandModel with the file and username
                     Console.WriteLine("Calling Train Demand Model");
-                    await TrainDemandModel(memoryStream, username);
+                    await TrainDemandModel(memoryStream, email);
 
                     // Call the PredictDemand method after successful training
-                    await PredictDemand(username);
+                    await PredictDemand(email);
                 }
             }
         }
-        public async Task<string> GetDemandDataFromStorageByUsername(string username)
+        public async Task<string> GetDemandDataFromStorageByUsername(string email)
         {
             var demandData = new List<dynamic>();
 
             // Define the path to the storage bucket and directory
-            string folderPath = $"upload_demands/{username}-upload-demands/";
+            string folderPath = $"upload_demands/{email}-upload-demands/";
 
             // List objects in the specified folder
             var storageObjects = _storageClient.ListObjects(_bucketName, folderPath);
@@ -461,17 +461,17 @@ namespace ReStore___backend.Services.Implementations
             string jsonData = JsonConvert.SerializeObject(groupedData, Formatting.Indented);
             return jsonData;
         }
-        public async Task ProcessAndUploadDataSales(IEnumerable<dynamic> records, string username)
+        public async Task ProcessAndUploadDataSales(IEnumerable<dynamic> records, string email)
         {
             // Generate a timestamp
             string timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmm");
 
             // Create a filename
             string fileName = $"sales_{timestamp}.csv";
-            string folderPath = $"upload_sales/{username}-upload-sales/";
+            string folderPath = $"upload_sales/{email}-upload-sales/";
 
             // Decrease credits for each demand processed
-            await DecreaseCreditsAsync(username, 1); // Deduct 1 credit
+            await DecreaseCreditsAsync(email, 1); // Deduct 1 credit
 
             // Save the entire records to a MemoryStream
             using (var memoryStream = new MemoryStream())
@@ -507,18 +507,18 @@ namespace ReStore___backend.Services.Implementations
                 salesInsightStream.Position = 0;
 
                 // Call TrainModel using the copied stream
-                await TrainSalesModel(trainModelStream, username);
+                await TrainSalesModel(trainModelStream, email);
 
                 // Pass the copied memory stream to SalesInsight
-                await SalesInsight(salesInsightStream, username);
+                await SalesInsight(salesInsightStream, email);
             }
         }
-        public async Task<string> GetSalesDataFromStorageByUsername(string username)
+        public async Task<string> GetSalesDataFromStorageByUsername(string email)
         {
             var salesData = new List<SaleRecordDTO>();
 
             // Define the path to the storage bucket and directory without the trailing slash
-            string folderPath = $"upload_sales/{username}-upload-sales";
+            string folderPath = $"upload_sales/{email}-upload-sales";
 
             // Get the list of objects in the specified folder
             var files = _storageClient.ListObjects(_bucketName, folderPath).ToList();
@@ -799,10 +799,10 @@ namespace ReStore___backend.Services.Implementations
                 return $"Error during demand prediction: {ex.Message}";
             }
         }
-        public async Task<string> TrainDemandModel(MemoryStream file, string username)
+        public async Task<string> TrainDemandModel(MemoryStream file, string email)
         {
             Console.WriteLine("Calling Train Demand Model");
-            Console.WriteLine($"MemoryStream with {username}");
+            Console.WriteLine($"MemoryStream with {email}");
 
             if (file == null || file.Length == 0)
             {
@@ -818,10 +818,10 @@ namespace ReStore___backend.Services.Implementations
                     streamContent.Headers.ContentType = MediaTypeHeaderValue.Parse("text/csv");
 
                     // Add the MemoryStream as a CSV file in the form
-                    form.Add(streamContent, "file", $"{username}_file.csv"); // Use username for clarity
+                    form.Add(streamContent, "file", $"{email}_file.csv"); // Use username for clarity
 
                     // Add the username
-                    form.Add(new StringContent(username), "username");
+                    form.Add(new StringContent(email), "username");
 
                     string baseUrl = Environment.GetEnvironmentVariable("API_URL");
 
@@ -890,12 +890,12 @@ namespace ReStore___backend.Services.Implementations
                 return $"Error during model training: {ex.Message}";
             }
         }
-        public async Task<string> GetSalesPrediction(string username)
+        public async Task<string> GetSalesPrediction(string email)
         {
             try
             {
                 // Define the path to the storage bucket and directory without the trailing slash
-                string folderPath = $"AI Model/Sales_Prediction/{username}-sales-prediction/";
+                string folderPath = $"AI Model/Sales_Prediction/{email}-sales-prediction/";
 
                 // List objects in the specified folder
                 var files = _storageClient.ListObjectsAsync(_bucketName, folderPath);
@@ -946,14 +946,14 @@ namespace ReStore___backend.Services.Implementations
                 return $"Error in fetching and processing sales data: {ex.Message}";
             }
         }
-        public async Task<string> GetDemandPrediction(string username)
+        public async Task<string> GetDemandPrediction(string email)
         {
             try
             {
                 _httpClient.Timeout = TimeSpan.FromSeconds(3000);
 
                 string baseUrl = Environment.GetEnvironmentVariable("API_URL");
-                var requestUri = new Uri(new Uri(baseUrl), $"/demand_prediction?username={username}");
+                var requestUri = new Uri(new Uri(baseUrl), $"/demand_prediction?username={email}");
                 Console.WriteLine($"URL : {requestUri}");
 
                 HttpResponseMessage response = await _httpClient.GetAsync(requestUri);
