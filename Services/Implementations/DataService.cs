@@ -225,7 +225,7 @@ namespace ReStore___backend.Services.Implementations
                     IsBodyHtml = true,
                     Body = $@"
                     <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
-                        <div style='background-color: #D8FFE5; color: white; padding: 20px; text-align: center;'>
+                        <div style='background-color: #30A75F; color: white; padding: 20px; text-align: center;'>
                             <img src='cid:logoImage' alt='Restore Logo' style='height: 50px; margin-right: 10px;' />
                             <h2 style='margin: 0;'>Restore</h2>
                         </div>
@@ -233,7 +233,7 @@ namespace ReStore___backend.Services.Implementations
                             <h3 style='color: #333;'>You're nearly there!</h3>
                             <p>We just need to verify your email address to complete your Restore signup.</p>
                             <div style='text-align: center; margin: 20px 0;'>
-                                <a href='{verificationLink}' style='background-color: #30A75F; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;'>Verify email address</a>
+                                <a href='{verificationLink}' style='background-color: #D8FFE5; color: black; padding: 10px 20px; text-decoration: none; border-radius: 5px;'>Verify email address</a>
                             </div>
                             <p style='color: #555; font-size: 0.9em;'>Please note that this link will expire in 5 minutes.</p>
                             <p style='color: #555; font-size: 0.9em;'>If you have not signed up to Restore, please ignore this email.</p>
