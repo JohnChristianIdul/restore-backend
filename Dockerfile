@@ -27,4 +27,5 @@ RUN dotnet publish "./Restore-backend(deployment).csproj" -c $BUILD_CONFIGURATIO
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+COPY Restore.png /app/Restore.png
 ENTRYPOINT ["dotnet", "Restore-backend(deployment).dll"]
