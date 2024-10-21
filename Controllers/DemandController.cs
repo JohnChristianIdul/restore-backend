@@ -44,14 +44,16 @@ namespace ReStore___backend.Controllers
                     var records = csv.GetRecords<dynamic>().ToList();
 
                     // Call the service to process and upload the data
-                    Console.WriteLine($"{username}");
+                    Console.WriteLine($"{username} {email}");
                     await _dataService.ProcessAndUploadDataDemands(records, username, email);
+                    Console.WriteLine("Error occured here");
 
                     return Ok(new { success = "Data processed and uploaded to Cloud Storage" });
                 }
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"Entered an Exception : {ex.GetType}");
                 return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
             }
         }

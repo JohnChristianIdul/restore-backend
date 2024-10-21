@@ -97,7 +97,7 @@ namespace ReStore___backend.Services.Implementations
                     string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(phoneNumber) ||
                     string.IsNullOrWhiteSpace(password))
                 {
-                    return "Error: All fields are required.";
+                    return "All fields are required.";
                 }
 
                 var existingUserQuery = await _firestoreDb.Collection("Users")
@@ -105,7 +105,7 @@ namespace ReStore___backend.Services.Implementations
                     .GetSnapshotAsync();
                 if (existingUserQuery.Count > 0)
                 {
-                    return "Error: This email is already registered.";
+                    return "This email is already registered.";
                 }
 
                 var existingUsernameQuery = await _firestoreDb.Collection("Users")
@@ -113,7 +113,7 @@ namespace ReStore___backend.Services.Implementations
                     .GetSnapshotAsync();
                 if (existingUsernameQuery.Count > 0)
                 {
-                    return "Error: This username is already used.";
+                    return "This username is already used.";
                 }
 
                 var authResult = await FirebaseAuth.DefaultInstance.CreateUserAsync(new UserRecordArgs
