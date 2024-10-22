@@ -393,9 +393,7 @@ namespace ReStore___backend.Services.Implementations
             var recordList = records.ToList();
             var groupedRecords = recordList.GroupBy(record => record.ProductID);
             var folderPath = $"upload_demands/{username}-upload-demands/";
-
             await DecreaseCreditsAsync(email, 1);
-
             var tasks = new List<Task>();
 
             foreach (var group in groupedRecords)
@@ -403,35 +401,31 @@ namespace ReStore___backend.Services.Implementations
                 string productId = group.Key;
                 string fileName = $"product_{productId}.csv";
                 var objectName = $"{folderPath}{fileName}";
+                var memoryStream = new MemoryStream();
 
-                // Save the group to a MemoryStream
-                using (var memoryStream = new MemoryStream())
+                using (var writer = new StreamWriter(memoryStream, leaveOpen: true))
+                using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
                 {
-                    using (var writer = new StreamWriter(memoryStream, leaveOpen: true))
-                    using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
-                    {
-                        csv.WriteRecords(group);
-                        writer.Flush();
-                    }
-
-                    memoryStream.Position = 0;
-
-                    tasks.Add(Task.Run(async () =>
-                    {
-                        await _storageClient.UploadObjectAsync(_bucketName, objectName, null, memoryStream);
-                    }));
-
-                    tasks.Add(Task.Run(async () =>
-                    {
-                        Console.WriteLine("Calling Train Demand Model");
-                        await TrainDemandModel(memoryStream, username);
-                    }));
-
-                    tasks.Add(Task.Run(async () =>
-                    {
-                        await PredictDemand(username);
-                    }));
+                    csv.WriteRecords(group);
+                    writer.Flush();
                 }
+
+                memoryStream.Position = 0;
+
+                tasks.Add(Task.Run(async () =>
+                {
+                    await _storageClient.UploadObjectAsync(_bucketName, objectName, null, new MemoryStream(memoryStream.ToArray()));
+                }));
+
+                tasks.Add(Task.Run(async () =>
+                {
+                    await TrainDemandModel(new MemoryStream(memoryStream.ToArray()), username);
+                }));
+
+                tasks.Add(Task.Run(async () =>
+                {
+                    await PredictDemand(username);
+                }));
             }
 
             await Task.WhenAll(tasks);
