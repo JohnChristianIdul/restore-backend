@@ -22,9 +22,9 @@ namespace ReStore___backend.Controllers
             _dataService = dataService;
         }
 
-        // GET: api/insights/{email}
-        [HttpGet("{email}")]
-        public async Task<IActionResult> GetInsights(string username)
+        // GET: api/insight?username={username}
+        [HttpGet]
+        public async Task<IActionResult> GetInsights([FromQuery] string username)
         {
             var insightJson = await _dataService.GetSalesInsightByUsername(username);
 

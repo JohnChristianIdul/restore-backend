@@ -58,9 +58,12 @@ namespace ReStore___backend.Controllers
             }
         }
 
-        [HttpGet("demand/{username}")]
-        public async Task<IActionResult> GetDemandData(string username)
+        // api/Demands/demand?username={username}
+        [HttpGet("demand/")]
+        public async Task<IActionResult> GetDemandData([FromQuery] string username)
         {
+            if (string.IsNullOrEmpty(username))
+                return BadRequest(new { error = "Username is required." });
             try
             {
                 string demandDataJson = await _dataService.GetDemandDataFromStorageByUsername(username);

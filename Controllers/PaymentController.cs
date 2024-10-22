@@ -104,10 +104,14 @@ namespace Restore_backend_deployment_.Controllers
             });
         }
 
-        // api/payment/paymongo-webhook
+        // api/payment/paymongo-webhook/
         [HttpPost("paymongo-webhook")]
-        public async Task<IActionResult> HandlePaymentWebhook([FromBody] string sessionId)
+        public async Task<IActionResult> HandlePaymentWebhook([FromForm] string sessionId)
         {
+            if(sessionId == null)
+            {
+                return BadRequest(new { message = "No sessionId found." });
+            }
             // Log the received webhook for debugging purposes
             Console.WriteLine("Received PayMongo Webhook for session ID: " + sessionId);
 
