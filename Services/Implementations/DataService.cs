@@ -88,7 +88,6 @@ namespace ReStore___backend.Services.Implementations
             _firestoreDb = FirestoreDb.Create(_firebaseID, firestoreClient);
             _firebaseAuth = FirebaseAuth.DefaultInstance;
         }
-
         public async Task<string> SignUp(string email, string name, string username, string phoneNumber, string password)
         {
             try
@@ -194,7 +193,6 @@ namespace ReStore___backend.Services.Implementations
                 return (false, "An unexpected error occurred during verification.");
             }
         }
-
         private async Task<string> GetUserIdFromOobCode(string oobCode)
         {
             try
@@ -216,7 +214,6 @@ namespace ReStore___backend.Services.Implementations
                 return null;
             }
         }
-
         public async Task SendVerificationEmailAsync(string email, string verificationLink)
         {
             if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(verificationLink))
@@ -394,15 +391,12 @@ namespace ReStore___backend.Services.Implementations
         public async Task ProcessAndUploadDataDemands(IEnumerable<dynamic> records, string username, string email)
         {
             var recordList = records.ToList();
-
-            // Group by product_id and process each group
             var groupedRecords = recordList.GroupBy(record => record.ProductID);
-
-            // Create new folder in Cloud Storage
             var folderPath = $"upload_demands/{username}-upload-demands/";
 
-            // Decrease credits for each demand processed
-            await DecreaseCreditsAsync(email, 1); // Deduct 1 credit
+            await DecreaseCreditsAsync(email, 1);
+
+            var tasks = new List<Task>();
 
             foreach (var group in groupedRecords)
             {
@@ -416,27 +410,31 @@ namespace ReStore___backend.Services.Implementations
                     using (var writer = new StreamWriter(memoryStream, leaveOpen: true))
                     using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
                     {
-                        // Write records group to CSV
                         csv.WriteRecords(group);
                         writer.Flush();
                     }
 
-                    // Reset the position of the memory stream to the beginning
                     memoryStream.Position = 0;
 
-                    // Upload the CSV file to Cloud Storage
-                    await _storageClient.UploadObjectAsync(_bucketName, objectName, null, memoryStream);
+                    tasks.Add(Task.Run(async () =>
+                    {
+                        await _storageClient.UploadObjectAsync(_bucketName, objectName, null, memoryStream);
+                    }));
 
-                    memoryStream.Position = 0;
+                    tasks.Add(Task.Run(async () =>
+                    {
+                        Console.WriteLine("Calling Train Demand Model");
+                        await TrainDemandModel(memoryStream, username);
+                    }));
 
-                    // Call TrainDemandModel with the file and username
-                    Console.WriteLine("Calling Train Demand Model");
-                    await TrainDemandModel(memoryStream, username);
-
-                    // Call the PredictDemand method after successful training
-                    await PredictDemand(username);
+                    tasks.Add(Task.Run(async () =>
+                    {
+                        await PredictDemand(username);
+                    }));
                 }
             }
+
+            await Task.WhenAll(tasks);
         }
         public async Task<string> GetDemandDataFromStorageByUsername(string username)
         {
@@ -833,7 +831,6 @@ namespace ReStore___backend.Services.Implementations
             {
                 using (var form = new MultipartFormDataContent())
                 {
-                    // Set up the MemoryStream content
                     var streamContent = new StreamContent(file);
                     streamContent.Headers.ContentType = MediaTypeHeaderValue.Parse("text/csv");
 
@@ -1094,7 +1091,6 @@ namespace ReStore___backend.Services.Implementations
                 throw;
             }
         }
-
         public async Task<int> GetCustomerCreditsAsync(string email)
         {
             try
@@ -1128,7 +1124,6 @@ namespace ReStore___backend.Services.Implementations
                 throw;
             }
         }
-
         public async Task SavePaymentReceiptAsync(PaymentReceipt receipt)
         {
             CollectionReference receiptsCollection = _firestoreDb.Collection("paymentReceipts");

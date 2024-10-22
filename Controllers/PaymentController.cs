@@ -86,7 +86,7 @@ namespace Restore_backend_deployment_.Controllers
 
             // Create the checkout session in PayMongo and return the checkout URL.
             var checkoutSessionResponse = await CreateCheckoutSessionInPayMongo(checkoutSessionBody);
-
+            
             if (checkoutSessionResponse == null)
             {
                 return BadRequest(new { message = "Failed to create checkout session." });
@@ -304,6 +304,6 @@ namespace Restore_backend_deployment_.Controllers
 
                 throw;
             }
-        }        
+        }
     }
 }
