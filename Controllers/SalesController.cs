@@ -56,8 +56,8 @@ namespace ReStore___backend.Controllers
         }
 
         // GET method to retrieve sales data for a specific user
-        [HttpGet("sales/{email}")]
-        public async Task<IActionResult> GetSalesData(string username)
+        [HttpGet("sales/")]
+        public async Task<IActionResult> GetSalesData([FromQuery] string username)
         {
             if (string.IsNullOrEmpty(username))
                 return BadRequest(new { error = "Username is required." });
