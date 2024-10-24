@@ -390,6 +390,7 @@ namespace ReStore___backend.Services.Implementations
         }
         public async Task ProcessAndUploadDataDemands(IEnumerable<dynamic> records, string username, string email)
         {
+
             var recordList = records.ToList();
             var groupedRecords = recordList.GroupBy(record => record.ProductID);
             var folderPath = $"upload_demands/{username}-upload-demands/";
