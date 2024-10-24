@@ -20,7 +20,6 @@ using ReStore___backend.Controllers;
 using Firebase.Auth.Objects;
 using Restore_backend_deployment_.Models;
 using FirebaseAuth = FirebaseAdmin.Auth.FirebaseAuth;
-using Restore_backend_deployment_.DTO_s;
 
 
 namespace ReStore___backend.Services.Implementations
@@ -492,13 +491,7 @@ namespace ReStore___backend.Services.Implementations
             {
                 using (var writer = new StreamWriter(memoryStream, leaveOpen: true))
                 using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
-                {
-                    var saleRecords = records.Select(record => new SalesRecordDTO
-                    {
-                        Month = record.Month,
-                        Sales = record.Sales,
-                    }).ToList();
-
+                {                    
                     // Write all records to the CSV writer
                     csv.WriteRecords(records);
                 }

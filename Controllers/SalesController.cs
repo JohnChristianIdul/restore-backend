@@ -25,71 +25,69 @@ namespace ReStore___backend.Controllers
 
             if (string.IsNullOrEmpty(username))
                 return BadRequest(new { error = "Username is required." });
-            
+
             if (string.IsNullOrEmpty(email))
                 return BadRequest(new { error = "Email is required." });
 
             try
             {
-                var filePath = Path.Combine(Path.GetTempPath(), file.FileName);
-                using (var stream = new FileStream(filePath, FileMode.Create))
+                // Step 1: Save the uploaded Excel file to a temporary location
+                var tempExcelFilePath = Path.Combine(Path.GetTempPath(), file.FileName);
+                using (var stream = new FileStream(tempExcelFilePath, FileMode.Create))
                 {
                     await file.CopyToAsync(stream);
                 }
 
-                List<dynamic> records;
-
-                if (file.ContentType == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
-                    file.ContentType == "application/vnd.ms-excel")
+                // Step 2: Convert the Excel file to CSV
+                var csvFilePath = Path.Combine(Path.GetTempPath(), Path.GetFileNameWithoutExtension(file.FileName) + ".csv");
+                using (var package = new ExcelPackage(new FileInfo(tempExcelFilePath)))
                 {
-                    // Handle Excel file
-                    using (var package = new ExcelPackage(new FileInfo(filePath)))
+                    var worksheet = package.Workbook.Worksheets[0]; // Get the first worksheet
+                    var rowCount = worksheet.Dimension.Rows;
+                    var colCount = worksheet.Dimension.Columns;
+
+                    using (var writer = new StreamWriter(csvFilePath))
                     {
-                        var worksheet = package.Workbook.Worksheets[0]; // Get the first worksheet
-                        var rowCount = worksheet.Dimension.Rows;
-                        var colCount = worksheet.Dimension.Columns;
-
-                        records = new List<dynamic>();
-
-                        var headers = new List<string>();
+                        // Write the headers
                         for (int col = 1; col <= colCount; col++)
                         {
-                            headers.Add(worksheet.Cells[1, col].Text);
+                            writer.Write(worksheet.Cells[1, col].Text);
+                            if (col < colCount) writer.Write(","); // Add comma for CSV format
                         }
+                        writer.WriteLine();
 
+                        // Write the data rows
                         for (int row = 2; row <= rowCount; row++) // Start from the second row
                         {
-                            var record = new Dictionary<string, string>();
                             for (int col = 1; col <= colCount; col++)
                             {
-                                record[headers[col - 1]] = worksheet.Cells[row, col].Text;
+                                writer.Write(worksheet.Cells[row, col].Text);
+                                if (col < colCount) writer.Write(","); // Add comma for CSV format
                             }
-                            records.Add(record);
+                            writer.WriteLine();
                         }
                     }
                 }
-                else if (file.ContentType == "text/csv")
+
+                // Step 3: Read the CSV file for further processing
+                List<dynamic> records;
+                using (var reader = new StreamReader(csvFilePath))
+                using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
                 {
-                    // Handle CSV file
-                    using (var reader = new StreamReader(filePath))
-                    using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
-                    {
-                        records = csv.GetRecords<dynamic>().ToList();
-                    }
-                }
-                else
-                {
-                    return BadRequest(new { error = "Unsupported file type." });
+                    records = csv.GetRecords<dynamic>().ToList();
                 }
 
-                // Call the service to process and upload the data
-                Console.WriteLine($"{email}");
+                // Step 4: Call the service to process and upload the data
                 await _dataService.ProcessAndUploadDataSales(records, username, email);
 
                 return Ok(new { success = "Data processed and uploaded to Cloud Storage" });
             }
             catch (Exception ex)
             {
+                // Log the exception for debugging purposes (optional)
+                Console.WriteLine($"Error: {ex.Message}");
+
+                // Return a 500 status code with the error message
                 return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
             }
         }
