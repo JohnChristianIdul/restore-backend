@@ -31,53 +31,68 @@ namespace ReStore___backend.Controllers
 
             try
             {
-                // Step 1: Save the uploaded Excel file to a temporary location
-                var tempExcelFilePath = Path.Combine(Path.GetTempPath(), file.FileName);
-                using (var stream = new FileStream(tempExcelFilePath, FileMode.Create))
-                {
-                    await file.CopyToAsync(stream);
-                }
+                List<dynamic> records;
+                var fileExtension = Path.GetExtension(file.FileName).ToLower();
 
-                // Step 2: Convert the Excel file to CSV
-                var csvFilePath = Path.Combine(Path.GetTempPath(), Path.GetFileNameWithoutExtension(file.FileName) + ".csv");
-                using (var package = new ExcelPackage(new FileInfo(tempExcelFilePath)))
+                if (fileExtension == ".xlsx" || fileExtension == ".xls")
                 {
-                    var worksheet = package.Workbook.Worksheets[0]; // Get the first worksheet
-                    var rowCount = worksheet.Dimension.Rows;
-                    var colCount = worksheet.Dimension.Columns;
-
-                    using (var writer = new StreamWriter(csvFilePath))
+                    // Handle Excel file
+                    var tempExcelFilePath = Path.Combine(Path.GetTempPath(), file.FileName);
+                    using (var stream = new FileStream(tempExcelFilePath, FileMode.Create))
                     {
-                        // Write the headers
-                        for (int col = 1; col <= colCount; col++)
-                        {
-                            writer.Write(worksheet.Cells[1, col].Text);
-                            if (col < colCount) writer.Write(","); // Add comma for CSV format
-                        }
-                        writer.WriteLine();
+                        await file.CopyToAsync(stream);
+                    }
 
-                        // Write the data rows
-                        for (int row = 2; row <= rowCount; row++) // Start from the second row
+                    var csvFilePath = Path.Combine(Path.GetTempPath(), Path.GetFileNameWithoutExtension(file.FileName) + ".csv");
+                    using (var package = new ExcelPackage(new FileInfo(tempExcelFilePath)))
+                    {
+                        var worksheet = package.Workbook.Worksheets[0];
+                        var rowCount = worksheet.Dimension.Rows;
+                        var colCount = worksheet.Dimension.Columns;
+
+                        using (var writer = new StreamWriter(csvFilePath))
                         {
+                            // Write the headers
                             for (int col = 1; col <= colCount; col++)
                             {
-                                writer.Write(worksheet.Cells[row, col].Text);
-                                if (col < colCount) writer.Write(","); // Add comma for CSV format
+                                writer.Write(worksheet.Cells[1, col].Text);
+                                if (col < colCount) writer.Write(",");
                             }
                             writer.WriteLine();
+
+                            for (int row = 2; row <= rowCount; row++)
+                            {
+                                for (int col = 1; col <= colCount; col++)
+                                {
+                                    writer.Write(worksheet.Cells[row, col].Text);
+                                    if (col < colCount) writer.Write(",");
+                                }
+                                writer.WriteLine();
+                            }
                         }
                     }
-                }
 
-                // Step 3: Read the CSV file for further processing
-                List<dynamic> records;
-                using (var reader = new StreamReader(csvFilePath))
-                using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
+                    // Read from the generated CSV file
+                    using (var reader = new StreamReader(csvFilePath))
+                    using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
+                    {
+                        records = csv.GetRecords<dynamic>().ToList();
+                    }
+                }
+                else if (fileExtension == ".csv")
                 {
-                    records = csv.GetRecords<dynamic>().ToList();
+                    // Handle CSV file directly
+                    using (var reader = new StreamReader(file.OpenReadStream()))
+                    using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
+                    {
+                        records = csv.GetRecords<dynamic>().ToList();
+                    }
+                }
+                else
+                {
+                    return BadRequest(new { error = "Unsupported file format. Please upload an Excel or CSV file." });
                 }
 
-                // Step 4: Call the service to process and upload the data
                 await _dataService.ProcessAndUploadDataSales(records, username, email);
 
                 return Ok(new { success = "Data processed and uploaded to Cloud Storage" });
