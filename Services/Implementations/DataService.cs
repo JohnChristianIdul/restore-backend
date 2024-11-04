@@ -17,8 +17,8 @@ using System.Net.Mail;
 using System.Net;
 using FirebaseAdmin;
 using ReStore___backend.Controllers;
-using Firebase.Auth.Objects;
 using Restore_backend_deployment_.Models;
+using Azure.Storage.Blobs;
 using FirebaseAuth = FirebaseAdmin.Auth.FirebaseAuth;
 
 
@@ -36,57 +36,108 @@ namespace ReStore___backend.Services.Implementations
         private readonly string _renderUrl;
         private readonly string _location;
         private readonly string _endpointId;
-        private readonly string _credentials;
+        //private readonly string _credentials;
+        private readonly GoogleCredential _credentials;
         private readonly string _smtpEmail;
         private readonly string _smtpPassword;
         private readonly FirebaseAuth _firebaseAuth;
         private readonly ILogger<AuthController> _logger;
 
+        //public DataService(ILogger<AuthController> logger)
+        //{
+        //    _httpClient = new HttpClient();
+        //    string firebaseApiKey = Environment.GetEnvironmentVariable("FIREBASE_API_KEY");
+        //    _bucketName = Environment.GetEnvironmentVariable("FIREBASE_BUCKET_NAME");
+        //    //_credentials = "/etc/secrets/GOOGLE_APPLICATION_CREDENTIALS";
+        //    _smtpPassword = Environment.GetEnvironmentVariable("SMTP_EMAIL_PASSWORD");
+        //    _smtpEmail = Environment.GetEnvironmentVariable("SMTP_EMAIL");
+        //    _renderUrl = Environment.GetEnvironmentVariable("API_URL_RENDER");
+        //    _logger = logger;
+
+        //    // Load credentials from file explicitly
+        //    GoogleCredential credential;
+        //    using (var stream = new FileStream(_credentials, FileMode.Open, FileAccess.Read))
+        //    {
+        //        credential = GoogleCredential.FromStream(stream);
+        //    }
+        //    _storageClient = StorageClient.Create(credential);
+
+        //    // Firebase Auth
+        //    try
+        //    {
+        //        _authProvider = new FirebaseAuthProvider(new FirebaseConfig(firebaseApiKey));
+        //        Console.WriteLine("Firebase Auth initialized successfully");
+
+        //        FirebaseApp.Create(new AppOptions()
+        //        {
+        //            Credential = GoogleCredential.FromFile(_credentials)
+        //        });
+        //        Console.WriteLine("FirebaseApp initialized successfully");
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        Console.WriteLine($"Error initializing Firebase Auth: {ex.Message}");
+        //    }
+
+        //    // Initialize Firestore using the same credentials
+        //    var firestoreClientBuilder = new FirestoreClientBuilder
+        //    {
+        //        Credential = credential
+        //    };
+        //    var firestoreClient = firestoreClientBuilder.Build();
+        //    var _firebaseID = Environment.GetEnvironmentVariable("FIREBASE_STORAGE_ID");
+        //    _firestoreDb = FirestoreDb.Create(_firebaseID, firestoreClient);
+        //    _firebaseAuth = FirebaseAuth.DefaultInstance;
+        //}
         public DataService(ILogger<AuthController> logger)
         {
             _httpClient = new HttpClient();
             string firebaseApiKey = Environment.GetEnvironmentVariable("FIREBASE_API_KEY");
-            _bucketName = Environment.GetEnvironmentVariable("FIREBASE_BUCKET_NAME");
-            _credentials = "/etc/secrets/GOOGLE_APPLICATION_CREDENTIALS";
-            _smtpPassword = Environment.GetEnvironmentVariable("SMTP_EMAIL_PASSWORD");
-            _smtpEmail = Environment.GetEnvironmentVariable("SMTP_EMAIL");
-            _renderUrl = Environment.GetEnvironmentVariable("API_URL_RENDER");
-            _logger = logger;
+            string _bucketName = Environment.GetEnvironmentVariable("FIREBASE_BUCKET_NAME");
+            string _smtpPassword = Environment.GetEnvironmentVariable("SMTP_EMAIL_PASSWORD");
+            string _smtpEmail = Environment.GetEnvironmentVariable("SMTP_EMAIL");
+            string _renderUrl = Environment.GetEnvironmentVariable("API_URL_RENDER");
+            string blobConnectionString = Environment.GetEnvironmentVariable("BLOB_CONNECTION_STRING");
+            string containerName = Environment.GetEnvironmentVariable("BLOB_CONTAINER_NAME");
+            string blobName = Environment.GetEnvironmentVariable("BLOB_NAME");
 
-            // Load credentials from file explicitly
-            GoogleCredential credential;
-            using (var stream = new FileStream(_credentials, FileMode.Open, FileAccess.Read))
+            // Load credentials from Azure Blob Storage
+            var blobServiceClient = new BlobServiceClient(blobConnectionString);
+            var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+            var blobClient = containerClient.GetBlobClient(blobName);
+
+            using (var memoryStream = new MemoryStream())
             {
-                credential = GoogleCredential.FromStream(stream);
-            }
-            _storageClient = StorageClient.Create(credential);
+                blobClient.DownloadTo(memoryStream);
+                memoryStream.Position = 0; // Reset stream position
 
-            // Firebase Auth
-            try
-            {
-                _authProvider = new FirebaseAuthProvider(new FirebaseConfig(firebaseApiKey));
-                Console.WriteLine("Firebase Auth initialized successfully");
+                // Load Google credentials from the stream
+                _credentials = GoogleCredential.FromStream(memoryStream);
+                _storageClient = StorageClient.Create(_credentials);
 
-                FirebaseApp.Create(new AppOptions()
+                // Firebase Auth
+                try
                 {
-                    Credential = GoogleCredential.FromFile(_credentials)
-                });
-                Console.WriteLine("FirebaseApp initialized successfully");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error initializing Firebase Auth: {ex.Message}");
-            }
+                    _authProvider = new FirebaseAuthProvider(new FirebaseConfig(firebaseApiKey));
+                    Console.WriteLine("Firebase Auth initialized successfully");
 
-            // Initialize Firestore using the same credentials
-            var firestoreClientBuilder = new FirestoreClientBuilder
-            {
-                Credential = credential
-            };
-            var firestoreClient = firestoreClientBuilder.Build();
-            var _firebaseID = Environment.GetEnvironmentVariable("FIREBASE_STORAGE_ID");
-            _firestoreDb = FirestoreDb.Create(_firebaseID, firestoreClient);
-            _firebaseAuth = FirebaseAuth.DefaultInstance;
+                    FirebaseApp.Create(new AppOptions
+                    {
+                        Credential = _credentials
+                    });
+                    Console.WriteLine("FirebaseApp initialized successfully");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error initializing Firebase Auth: {ex.Message}");
+                }
+
+                // Initialize Firestore
+                var firestoreClientBuilder = new FirestoreClientBuilder { Credential = _credentials };
+                var firestoreClient = firestoreClientBuilder.Build();
+                var _firebaseID = Environment.GetEnvironmentVariable("FIREBASE_STORAGE_ID");
+                _firestoreDb = FirestoreDb.Create(_firebaseID, firestoreClient);
+            }
         }
         public async Task<string> SignUp(string email, string name, string username, string phoneNumber, string password)
         {
