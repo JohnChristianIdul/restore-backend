@@ -42,16 +42,6 @@ builder.Services.AddSwaggerGen(c =>
     c.OperationFilter<FileUploadOperationFilter>();
 });
 
-// Add google credential env
-var builders = new ConfigurationBuilder()
-    .SetBasePath(Directory.GetCurrentDirectory())
-    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-    .AddEnvironmentVariables();
-
-var configuration = builders.Build();
-
-var googleCredential = GoogleCredential.FromFile(configuration["Google:CredentialsFile"]);
-
 // Register any other necessary services
 builder.Services.AddSingleton(new PayMongoSettings
 {
