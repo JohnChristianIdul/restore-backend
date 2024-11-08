@@ -93,7 +93,7 @@ namespace ReStore___backend.Controllers
                 // Call the service to process and upload the data
                 await _dataService.ProcessAndUploadDataDemands(records, username, email);
 
-                return Ok(new { success = "Data processed and uploaded to Cloud Storage" });
+                return Ok(new { success = "Data processed and uploaded to Cloud Storage", records_data = records });
             }
             catch (Exception ex)
             {
