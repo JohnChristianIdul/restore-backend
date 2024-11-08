@@ -63,9 +63,12 @@ namespace ReStore___backend.Controllers
 
                         foreach (System.Data.DataRow row in dataTable.Rows)
                         {
+                            DateTime monthDate;
+                            string monthFormatted = DateTime.TryParse(row["Month"].ToString(), out monthDate) ? monthDate.ToString("MM/dd/yyyy") : row["Month"].ToString();
+
                             records.Add(new
                             {
-                                Month = row["Month"].ToString(),
+                                Month = monthFormatted,
                                 ProductID = row["ProductID"].ToString(),
                                 Product = row["Product"].ToString(),
                                 UnitsSold = row["UnitsSold"].ToString()
