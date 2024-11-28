@@ -492,7 +492,7 @@ namespace ReStore___backend.Services.Implementations
             {
                 using (var writer = new StreamWriter(memoryStream, leaveOpen: true))
                 using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
-                {                    
+                {
                     // Write all records to the CSV writer
                     csv.WriteRecords(records);
                 }
@@ -503,8 +503,17 @@ namespace ReStore___backend.Services.Implementations
                 // Define the object name for cloud storage
                 var objectName = $"{folderPath}{fileName}";
 
-                // Upload the CSV file to Cloud Storage
-                await _storageClient.UploadObjectAsync(_bucketName, objectName, null, memoryStream);
+                try
+                {
+                    // Upload the CSV file to Cloud Storage
+                    await _storageClient.UploadObjectAsync(_bucketName, objectName, null, memoryStream);
+                }
+                catch (Exception uploadEx)
+                {
+                    // Log upload error and handle retries or escalation logic (if needed)
+                    Console.WriteLine($"Error uploading to cloud storage: {uploadEx.Message}");
+                    throw;
+                }
 
                 // Create copies of the memory stream to prevent "closed stream" issues
                 memoryStream.Position = 0;
@@ -520,11 +529,20 @@ namespace ReStore___backend.Services.Implementations
                 trainModelStream.Position = 0;
                 salesInsightStream.Position = 0;
 
-                // Call TrainModel using the copied stream
-                await TrainSalesModel(trainModelStream, username);
+                try
+                {
+                    // Call TrainModel using the copied stream
+                    await TrainSalesModel(trainModelStream, username);
 
-                // Pass the copied memory stream to SalesInsight
-                await SalesInsight(salesInsightStream, username);
+                    // Pass the copied memory stream to SalesInsight
+                    await SalesInsight(salesInsightStream, username);
+                }
+                catch (Exception processEx)
+                {
+                    // Log any errors in the processing steps
+                    Console.WriteLine($"Error during model training or insight generation: {processEx.Message}");
+                    throw;
+                }
             }
         }
         public async Task<string> GetSalesDataFromStorageByUsername(string username)

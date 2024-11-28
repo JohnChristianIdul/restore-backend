@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using OfficeOpenXml;
 using ReStore___backend.Services.Interfaces;
 using System.Globalization;
+using System.IO;
 
 namespace ReStore___backend.Controllers
 {
@@ -29,6 +30,10 @@ namespace ReStore___backend.Controllers
             if (string.IsNullOrEmpty(email))
                 return BadRequest(new { error = "Email is required." });
 
+            // Declare the file paths outside the try block
+            string tempExcelFilePath = null;
+            string csvFilePath = null;
+
             try
             {
                 List<dynamic> records;
@@ -37,13 +42,13 @@ namespace ReStore___backend.Controllers
                 if (fileExtension == ".xlsx" || fileExtension == ".xls")
                 {
                     // Handle Excel file
-                    var tempExcelFilePath = Path.Combine(Path.GetTempPath(), file.FileName);
+                    tempExcelFilePath = Path.Combine(Path.GetTempPath(), file.FileName);
                     using (var stream = new FileStream(tempExcelFilePath, FileMode.Create))
                     {
                         await file.CopyToAsync(stream);
                     }
 
-                    var csvFilePath = Path.Combine(Path.GetTempPath(), Path.GetFileNameWithoutExtension(file.FileName) + ".csv");
+                    csvFilePath = Path.Combine(Path.GetTempPath(), Path.GetFileNameWithoutExtension(file.FileName) + ".csv");
                     using (var package = new ExcelPackage(new FileInfo(tempExcelFilePath)))
                     {
                         var worksheet = package.Workbook.Worksheets[0];
@@ -104,6 +109,18 @@ namespace ReStore___backend.Controllers
 
                 // Return a 500 status code with the error message
                 return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+            }
+            finally
+            {
+                // Clean up temporary files, check if file paths are not null
+                if (!string.IsNullOrEmpty(tempExcelFilePath) && System.IO.File.Exists(tempExcelFilePath))
+                {
+                    System.IO.File.Delete(tempExcelFilePath);
+                }
+                if (!string.IsNullOrEmpty(csvFilePath) && System.IO.File.Exists(csvFilePath))
+                {
+                    System.IO.File.Delete(csvFilePath);
+                }
             }
         }
 
